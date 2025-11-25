@@ -189,32 +189,29 @@ def display_core_analysis(data_df, selected_freq):
         'Ngày', var_name='Loại Điểm', value_name='Điểm số'
     )
 
-    # 1. TẠO ĐỐI TƯỢNG LỰA CHỌN (SELECTION)
-    # Lựa chọn dựa trên trường "Loại Điểm" (Chỉ mục màu)
-    # type='multi' cho phép chọn nhiều đường, fields=['Loại Điểm'] là trường được chọn
-    selection = alt.selection_point(
-        fields=['Loại Điểm'], 
-        bind='legend', # Gắn vào chú thích (legend)
-        type='multi' # Quan trọng để cho phép click ẩn/hiện nhiều đường
-    )
-    
+    # 1. TẠO TƯƠNG TÁC (SELECTION)
+    # bind='legend': Cho phép click vào chú thích để chọn
+    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
+
     # Vẽ biểu đồ Altair
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
         y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
         
-        # --- MÀU SẮC THEO YÊU CẦU ---
+        # --- MÀU SẮC ---
         color=alt.Color('Loại Điểm:N',
             scale=alt.Scale(
                 domain=['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm'],
                 range=['#FF4B4B', '#2E8B57', '#1E90FF'] 
             ),
-            # Gắn Selection vào Legend để Click vào Legend thì biểu đồ tương tác
-            legend=alt.Legend(title="Chú thích", orient="bottom", select=selection) 
+            # LƯU Ý: Không thêm tham số 'select' vào đây nữa
+            legend=alt.Legend(title="Chú thích (Click để lọc)", orient="bottom")
         ),
         
-        # 2. THÊM ĐIỀU KIỆN ẨN/HIỆN (OPACITY)
-        opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
+        # 2. ĐIỀU KIỆN ẨN/HIỆN
+        # Nếu được chọn (hoặc chưa chọn gì) -> Hiện rõ (1)
+        # Nếu không được chọn -> Mờ đi (0.1)
+        opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
         
         tooltip=[
             alt.Tooltip('Ngày:T', title='Thời gian', format='%d/%m/%Y'),
@@ -222,7 +219,7 @@ def display_core_analysis(data_df, selected_freq):
             alt.Tooltip('Điểm số:Q', format='.1f')
         ]
     ).add_params(
-        selection # Thêm selection vào biểu đồ
+        selection # 3. THÊM TƯƠNG TÁC VÀO BIỂU ĐỒ
     ).interactive()
     
     st.altair_chart(chart, use_container_width=True)
@@ -344,4 +341,5 @@ with col3:
 # Phần Footer đơn giản
 
 st.sidebar.success("IAS Demo sẵn sàng.")
+
 
