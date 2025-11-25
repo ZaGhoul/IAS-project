@@ -195,7 +195,7 @@ def display_core_analysis(data_df, selected_freq):
     selection = alt.selection_point(
         fields=['Loại Điểm'], 
         bind='legend', # Gắn vào chú thích (legend)
-        name='line_selection'
+        type='multi' # Quan trọng để cho phép click ẩn/hiện nhiều đường
     )
     
     # Vẽ biểu đồ Altair
@@ -344,3 +344,4 @@ with col3:
 # Phần Footer đơn giản
 
 st.sidebar.success("IAS Demo sẵn sàng.")
+
