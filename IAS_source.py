@@ -7,7 +7,7 @@ import altair as alt
 # --- CSS Tùy Chỉnh Nâng Cao ---
 st.markdown("""
 <style>
-/* 1. Cấu trúc trang (Giữ nguyên) */
+/* 1. Cấu trúc trang */
 div.block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
@@ -22,13 +22,11 @@ div.block-container {
     font-size: 1.25rem !important; 
 }
 
-/* --- KHÔI PHỤC MÀU SẮC DỄ NHÌN --- */
-
-/* Trạng thái BÌNH THƯỜNG: Viền Trắng Sáng (thay vì xám tối) */
+/* Trạng thái BÌNH THƯỜNG: Viền Trắng Sáng */
 div[data-testid="stSelectbox"] div[role="combobox"] {
     border: 1px solid #fafafa; /* Màu trắng sáng dễ nhìn */
     border-radius: 0.5rem;
-    background-color: transparent; /* Hoặc để màu nền mặc định */
+    background-color: transparent;
 }
 
 /* Trạng thái HOVER (Lia chuột): Viền Xanh Lá */
@@ -37,20 +35,20 @@ div[data-testid="stSelectbox"] div[role="combobox"]:hover {
     cursor: pointer;
 }
 
-/* Trạng thái FOCUS (Đang chọn): Viền Xanh (Thay thế hoàn toàn màu Đỏ) */
+/* Trạng thái FOCUS (Đang chọn): Viền Xanh */
 div[data-testid="stSelectbox"] div[role="combobox"]:focus-within {
     border-color: #4CAF50 !important; /* Đổi màu đỏ thành xanh */
     box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25) !important; /* Vầng sáng xanh */
 }
 
-/* Mũi tên sổ xuống: Màu trắng (hoặc xanh) cho dễ nhìn */
+/* Mũi tên sổ xuống: Màu trắng (hoặc xanh) */
 div[data-testid="stSelectbox"] svg {
     fill: #fafafa !important; 
 }
 
 /* --- CÁC PHẦN KHÁC --- */
 
-/* Viền Bảng Dữ liệu: Cũng dùng màu trắng sáng cho đồng bộ */
+/* Viền Bảng Dữ liệu */
 .stDataFrame {
     border: 1px solid #fafafa; 
 }
@@ -88,7 +86,7 @@ def generate_behavior_data(student_id):
         violation_trend = np.full(N, 8) 
         positive_trend = np.full(N, 8)
         
-    # Thêm nhiễu ngẫu nhiên (Noise) để dữ liệu trông tự nhiên hơn
+    # Thêm nhiễu ngẫu nhiên (Noise)
     # np.clip để đảm bảo điểm không bị âm hoặc quá vô lý
     violation_data = np.clip(violation_trend + np.random.normal(0, 2, N), 0, 30).round(1)
     positive_data = np.clip(positive_trend + np.random.normal(0, 2, N), 0, 20).round(1)
@@ -98,7 +96,7 @@ def generate_behavior_data(student_id):
     base_score = 90
     conduct_score = base_score + positive_data - violation_data
     
-    # Giới hạn điểm hạnh kiểm (ví dụ: tối đa 100 hoặc 110 tùy quy định, ở đây tôi để thả nổi nhưng ko dưới 0)
+    # Giới hạn điểm hạnh kiểm (tối đa 100 nhưng ko dưới 0)
     conduct_score = np.clip(conduct_score, 0, 100)
 
     data = {
@@ -120,7 +118,7 @@ def calculate_score(df):
 
 def display_core_analysis(data_df, selected_freq):
     # --- Logic Nhóm Dữ liệu ---
-    # Chúng ta cần tính trung bình cho cả 3 cột dữ liệu mới
+    #  Trung bình cho cả 3 cột dữ liệu
     cols_to_resample = ['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm']
     
     if selected_freq == "Ngày (Day)":
@@ -133,7 +131,7 @@ def display_core_analysis(data_df, selected_freq):
         chart_data = data_df[cols_to_resample].resample('M').mean()
         freq_label = "Tháng"
         
-    # --- 1. Xác định mốc thời gian (GIỮ NGUYÊN) ---
+    # --- 1. Xác định mốc thời gian ---
     current_date = data_df.index.max() 
     first_day_of_current_month = current_date.replace(day=1)
     last_day_of_last_month = first_day_of_current_month - datetime.timedelta(days=1)
@@ -159,7 +157,7 @@ def display_core_analysis(data_df, selected_freq):
     delta_score = (score_current_day - score_last_day).round(1)
     mean_score = score_current_day 
     
-    # Phân loại Hành vi (Cập nhật theo thang điểm 90)
+    # Phân loại Hành vi
     if mean_score >= 90:
         behavior_class = "A - Tốt"
         color = "#4CAF50" # Xanh lá
@@ -189,14 +187,9 @@ def display_core_analysis(data_df, selected_freq):
         'Ngày', var_name='Loại Điểm', value_name='Điểm số'
     )
 
-    # 1. TẠO TƯƠNG TÁC (SELECTION) - LOGIC ĐẢO NGƯỢC
-    # bind='legend': Click vào chú thích
-    # empty=False: Ban đầu chưa có gì được chọn
-    selection = alt.selection_point(
-        fields=['Loại Điểm'], 
-        bind='legend',
-        empty=False  # QUAN TRỌNG: Để mặc định ban đầu là "chưa chọn gì"
-    )
+    # 1. TẠO TƯƠNG TÁC (SELECTION)
+    # bind='legend': Cho phép click vào chú thích để chọn
+    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
 
     # Vẽ biểu đồ Altair
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
@@ -209,13 +202,14 @@ def display_core_analysis(data_df, selected_freq):
                 domain=['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm'],
                 range=['#FF4B4B', '#2E8B57', '#1E90FF'] 
             ),
-            legend=alt.Legend(title="Chú thích (Click để ẨN/HIỆN)", orient="bottom")
+            
+            legend=alt.Legend(title="Chú thích (Click để lọc)", orient="bottom")
         ),
         
-        # 2. ĐIỀU KIỆN ẨN/HIỆN (LOGIC ĐẢO NGƯỢC)
-        # - Nếu đường đó ĐƯỢC CHỌN (Selection=True) -> Mờ đi (Ẩn) -> Opacity 0.05
-        # - Nếu đường đó KHÔNG ĐƯỢC CHỌN (Mặc định) -> Hiện rõ -> Opacity 1
-        opacity=alt.condition(selection, alt.value(0.05), alt.value(1)),
+        # 2. ĐIỀU KIỆN ẨN/HIỆN
+        # Nếu được chọn (hoặc chưa chọn gì) -> Hiện rõ (1)
+        # Nếu không được chọn -> Mờ đi (0.1)
+        opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
         
         tooltip=[
             alt.Tooltip('Ngày:T', title='Thời gian', format='%d/%m/%Y'),
@@ -223,7 +217,7 @@ def display_core_analysis(data_df, selected_freq):
             alt.Tooltip('Điểm số:Q', format='.1f')
         ]
     ).add_params(
-        selection 
+        selection # 3. THÊM TƯƠNG TÁC VÀO BIỂU ĐỒ
     ).interactive()
     
     st.altair_chart(chart, use_container_width=True)
@@ -298,7 +292,6 @@ with col1:
         # Gọi hàm giả lập dữ liệu
         data_df = generate_behavior_data(st.session_state['current_student'])
         
-        # Hiển thị 5 dòng dữ liệu đầu tiên
         st.dataframe(data_df) 
         st.markdown(f"*(Tổng cộng {len(data_df)} số ngày theo dõi, đánh giá)*")
     else:
@@ -345,6 +338,7 @@ with col3:
 # Phần Footer đơn giản
 
 st.sidebar.success("IAS Demo sẵn sàng.")
+
 
 
 
