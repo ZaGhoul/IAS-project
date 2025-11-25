@@ -189,26 +189,40 @@ def display_core_analysis(data_df, selected_freq):
         'Ngày', var_name='Loại Điểm', value_name='Điểm số'
     )
 
+    # 1. TẠO ĐỐI TƯỢNG LỰA CHỌN (SELECTION)
+    # Lựa chọn dựa trên trường "Loại Điểm" (Chỉ mục màu)
+    # type='multi' cho phép chọn nhiều đường, fields=['Loại Điểm'] là trường được chọn
+    selection = alt.selection_point(
+        fields=['Loại Điểm'], 
+        bind='legend', # Gắn vào chú thích (legend)
+        name='line_selection'
+    )
+    
     # Vẽ biểu đồ Altair
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
-        y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)), # zero=False để biểu đồ focus vào vùng biến động
+        y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
         
         # --- MÀU SẮC THEO YÊU CẦU ---
         color=alt.Color('Loại Điểm:N',
             scale=alt.Scale(
                 domain=['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm'],
                 range=['#FF4B4B', '#2E8B57', '#1E90FF'] 
-                # Đỏ (Vi phạm), Xanh Lá (Tích cực), Xanh Da Trời (Hạnh kiểm)
             ),
-            legend=alt.Legend(title="Chú thích", orient="bottom")
+            # Gắn Selection vào Legend để Click vào Legend thì biểu đồ tương tác
+            legend=alt.Legend(title="Chú thích", orient="bottom", select=selection) 
         ),
+        
+        # 2. THÊM ĐIỀU KIỆN ẨN/HIỆN (OPACITY)
+        opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
         
         tooltip=[
             alt.Tooltip('Ngày:T', title='Thời gian', format='%d/%m/%Y'),
             alt.Tooltip('Loại Điểm:N'),
             alt.Tooltip('Điểm số:Q', format='.1f')
         ]
+    ).add_params(
+        selection # Thêm selection vào biểu đồ
     ).interactive()
     
     st.altair_chart(chart, use_container_width=True)
@@ -328,4 +342,5 @@ with col3:
         st.warning("👈 Vui lòng tải dữ liệu mẫu để xem đề xuất cá nhân hóa.")
 
 # Phần Footer đơn giản
+
 st.sidebar.success("IAS Demo sẵn sàng.")
