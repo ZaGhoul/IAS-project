@@ -4,100 +4,223 @@ import numpy as np
 import datetime
 import altair as alt
 
-# --- CSS Tùy Chỉnh Nâng Cao ---
+# ==========================================
+# 1. CẤU HÌNH & CSS
+# ==========================================
+st.set_page_config(layout="wide", page_title="Hệ thống IAS")
+
 st.markdown("""
 <style>
-/* 1. Cấu trúc trang */
+/* Cấu trúc trang */
 div.block-container {
-    padding-top: 2rem;
+    padding-top: 1rem;
     padding-bottom: 2rem;
-    padding-left: 5rem;
-    padding-right: 5rem;
+    padding-left: 3rem;
+    padding-right: 3rem;
 }
 
-/* 2. Tiêu đề Selectbox (Màu Xanh Lá, In đậm) */
+/* Selectbox Styling */
 .stSelectbox label {
     font-weight: bold;
     color: #4CAF50;
-    font-size: 1.25rem !important; 
+    font-size: 1.1rem !important; 
 }
-
-/* Trạng thái BÌNH THƯỜNG: Viền Trắng Sáng */
 div[data-testid="stSelectbox"] div[role="combobox"] {
-    border: 1px solid #fafafa; /* Màu trắng sáng dễ nhìn */
+    border: 1px solid #fafafa;
     border-radius: 0.5rem;
-    background-color: transparent;
 }
-
-/* Trạng thái HOVER (Lia chuột): Viền Xanh Lá */
 div[data-testid="stSelectbox"] div[role="combobox"]:hover {
     border-color: #4CAF50 !important; 
     cursor: pointer;
 }
-
-/* Trạng thái FOCUS (Đang chọn): Viền Xanh */
 div[data-testid="stSelectbox"] div[role="combobox"]:focus-within {
-    border-color: #4CAF50 !important; /* Đổi màu đỏ thành xanh */
-    box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25) !important; /* Vầng sáng xanh */
+    border-color: #4CAF50 !important;
+    box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25) !important;
 }
+div[data-testid="stSelectbox"] svg { fill: #fafafa !important; }
 
-/* Mũi tên sổ xuống: Màu trắng (hoặc xanh) */
-div[data-testid="stSelectbox"] svg {
-    fill: #fafafa !important; 
-}
-
-/* --- CÁC PHẦN KHÁC --- */
-
-/* Viền Bảng Dữ liệu */
-.stDataFrame {
-    border: 1px solid #fafafa; 
-}
-
-/* Nút bấm */
-.stButton button {
-    border: 1px solid #4CAF50;
-}
+/* DataFrame Styling */
+.stDataFrame { border: 1px solid #fafafa; }
+.stButton button { border: 1px solid #4CAF50; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Dữ liệu Mẫu Giả lập ---
-student_list = ["Nguyễn Văn A (Mã 001)", "Trần Thị B (Mã 002)", "Lê Văn C (Mã 003)"]
+# ==========================================
+# 2. KHỞI TẠO CƠ SỞ DỮ LIỆU GIẢ LẬP (SESSION STATE)
+# ==========================================
 
-# Hàm giả lập một tập dữ liệu hành vi mẫu
-@st.cache_data
-def generate_behavior_data(student_id):
-    N = 50 # Số ngày theo dõi
-    dates = pd.date_range(start='2025-10-01', periods=N, freq='D')
+def init_db():
+    # 1. Bảng Học sinh
+    if 'df_students' not in st.session_state:
+        data_hs = {
+            'MaHS': ['HS001', 'HS002', 'HS003', 'HS004', 'HS005'],
+            'Họ và tên': ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Phạm Thị D', 'Hoàng Văn E'],
+            'Ngày sinh': ['2008-01-15', '2008-05-20', '2008-11-02', '2008-03-10', '2008-08-18'],
+            'Lớp': ['11A1', '11A1', '11A2', '11A2', '11A3'],
+            'Điểm Tích cực': [15, 10, 8, 20, 5],
+            'Điểm Vi phạm': [5, 20, 8, 2, 10],
+            'Điểm Hạnh kiểm': [100, 80, 90, 108, 85] # 90 + 15 - 5 = 100
+        }
+        st.session_state['df_students'] = pd.DataFrame(data_hs)
+
+    # 2. Bảng Vi Phạm (Danh mục)
+    if 'df_violations' not in st.session_state:
+        data_vp = {
+            'MaVP': ['VP01', 'VP02', 'VP03'],
+            'Tên Vi phạm': ['Đi học muộn', 'Không làm bài tập', 'Mất trật tự'],
+            'Điểm trừ': [2, 5, 3]
+        }
+        st.session_state['df_violations'] = pd.DataFrame(data_vp)
+
+    # 3. Bảng Tích cực (Danh mục)
+    if 'df_achievements' not in st.session_state:
+        data_tc = {
+            'MaTC': ['TC01', 'TC02', 'TC03'],
+            'Tên Tích cực': ['Phát biểu xây dựng bài', 'Đạt điểm 10', 'Giúp đỡ bạn bè'],
+            'Điểm cộng': [2, 5, 3]
+        }
+        st.session_state['df_achievements'] = pd.DataFrame(data_tc)
+
+    # 4. Bảng Nhật ký Hành vi (Liên kết)
+    if 'df_logs' not in st.session_state:
+        # Tạo dữ liệu mẫu cho tuần hiện tại
+        today = datetime.date.today()
+        data_logs = {
+            'Ngày': [today, today, today - datetime.timedelta(days=1)],
+            'MaHS': ['HS001', 'HS002', 'HS001'],
+            'Loại': ['Tích cực', 'Vi phạm', 'Tích cực'], # Helper col
+            'Mã Hành vi': ['TC01', 'VP01', 'TC02'], # MaVP hoặc MaTC
+            'Ghi chú': ['Rất hăng hái', 'Vào lớp trễ 5p', 'Bài kiểm tra tốt']
+        }
+        st.session_state['df_logs'] = pd.DataFrame(data_logs)
+        # Đảm bảo cột Ngày là kiểu datetime
+        st.session_state['df_logs']['Ngày'] = pd.to_datetime(st.session_state['df_logs']['Ngày']).dt.date
+
+init_db()
+
+# Biến điều hướng trang
+if 'current_page' not in st.session_state:
+    st.session_state['current_page'] = 'dashboard' # Mặc định vào dashboard
+if 'selected_student_id' not in st.session_state:
+    st.session_state['selected_student_id'] = None
+
+# ==========================================
+# 3. LOGIC TRANG 1: QUẢN LÝ DỮ LIỆU (DATA TABLE)
+# ==========================================
+
+def render_data_management_page():
+    st.title("📂 BẢNG DỮ LIỆU HỆ THỐNG")
     
-    # --- Logic Xu hướng Cụ thể cho từng học sinh ---
+    # Chia layout: Bên trái chọn bảng/tuần, Bên phải hiển thị dữ liệu
+    col_ctrl, col_data = st.columns([1, 4])
     
-    if "Nguyễn Văn A" in student_id:
-        # Xu hướng Tốt lên: Vi phạm giảm dần, Tích cực tăng dần
-        violation_trend = np.linspace(15, 2, N)  # Vi phạm từ 15 điểm xuống 2 điểm
-        positive_trend = np.linspace(5, 15, N)   # Tích cực từ 5 điểm lên 15 điểm
+    with col_ctrl:
+        st.subheader("Cấu hình")
+        # Chọn bảng để xem
+        table_option = st.radio(
+            "Chọn Bảng Dữ liệu:",
+            ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi", "⚠️ Danh mục Vi phạm", "🏆 Danh mục Tích cực"]
+        )
         
-    elif "Trần Thị B" in student_id:
-        # Xu hướng Đi xuống: Vi phạm tăng dần, Tích cực giảm
+        st.markdown("---")
+        
+        # Nếu đang xem Nhật ký, hiện bộ lọc thời gian
+        if table_option == "📝 Nhật ký Hành vi":
+            st.info("Bộ lọc Thời gian")
+            view_mode = st.selectbox("Chế độ xem:", ["Tuần", "Tháng"])
+            
+            if view_mode == "Tuần":
+                # Chọn tuần (Giả lập số tuần trong năm)
+                current_week = datetime.date.today().isocalendar()[1]
+                selected_week = st.number_input("Chọn Tuần:", min_value=1, max_value=52, value=current_week)
+                st.caption(f"Đang xem dữ liệu Tuần {selected_week}")
+            else:
+                selected_month = st.number_input("Chọn Tháng:", min_value=1, max_value=12, value=datetime.date.today().month)
+
+    with col_data:
+        # --- HIỂN THỊ BẢNG HỌC SINH ---
+        if table_option == "👨‍🎓 Học sinh":
+            st.subheader("Danh sách Học sinh (Master Data)")
+            
+            # Sử dụng data_editor để có thể chọn dòng
+            edited_df = st.data_editor(
+                st.session_state['df_students'],
+                key="editor_students",
+                num_rows="dynamic",
+                use_container_width=True,
+                # Cấu hình chọn dòng (Selection)
+                on_change=None,
+            )
+            
+            # Phần CHUYỂN TRANG: Chọn học sinh để phân tích
+            st.markdown("### 🚀 Tác vụ")
+            
+            # Tạo danh sách chọn nhanh từ bảng
+            student_options = dict(zip(st.session_state['df_students']['MaHS'], st.session_state['df_students']['Họ và tên']))
+            
+            # Hộp chọn để nhảy sang trang phân tích
+            col_sel, col_btn = st.columns([3, 1])
+            with col_sel:
+                target_ma_hs = st.selectbox(
+                    "Chọn Học sinh để Phân tích chi tiết:",
+                    options=list(student_options.keys()),
+                    format_func=lambda x: f"{student_options[x]} ({x})"
+                )
+            with col_btn:
+                st.write("") # Spacer
+                st.write("") 
+                if st.button("Phân tích Ngay ▶️", type="primary"):
+                    # CẬP NHẬT TRẠNG THÁI ĐỂ CHUYỂN TRANG
+                    st.session_state['selected_student_id'] = target_ma_hs
+                    st.session_state['current_page'] = 'dashboard'
+                    st.rerun()
+
+        # --- HIỂN THỊ NHẬT KÝ HÀNH VI ---
+        elif table_option == "📝 Nhật ký Hành vi":
+            st.subheader("Nhật ký Hành vi Chi tiết")
+            # Ở đây có thể thêm logic lọc theo Tuần/Tháng dựa trên input bên trái
+            # Demo hiển thị toàn bộ
+            st.data_editor(st.session_state['df_logs'], num_rows="dynamic", use_container_width=True)
+
+        # --- CÁC BẢNG DANH MỤC KHÁC ---
+        elif table_option == "⚠️ Danh mục Vi phạm":
+            st.subheader("Danh mục Lỗi Vi phạm")
+            st.data_editor(st.session_state['df_violations'], num_rows="dynamic", use_container_width=True)
+            
+        elif table_option == "🏆 Danh mục Tích cực":
+            st.subheader("Danh mục Thành tích")
+            st.data_editor(st.session_state['df_achievements'], num_rows="dynamic", use_container_width=True)
+
+# ==========================================
+# 4. LOGIC TRANG 2: DASHBOARD IAS (NHƯ CŨ NHƯNG LIÊN KẾT DB)
+# ==========================================
+
+# --- Các hàm phụ trợ cũ ---
+def calculate_score(df):
+    score = df['Điểm Hạnh kiểm'].mean().round(1)
+    return score
+
+# Hàm tạo dữ liệu giả lập (Vẫn giữ để vẽ biểu đồ cho đẹp, nhưng lấy tên thật)
+def generate_behavior_data_mock(student_name):
+    N = 50 
+    dates = pd.date_range(end=datetime.date.today(), periods=N, freq='D')
+    
+    # Logic giả lập dựa trên tên (để demo sự khác biệt)
+    if "Nguyễn Văn A" in student_name:
+        violation_trend = np.linspace(15, 2, N)
+        positive_trend = np.linspace(5, 15, N)
+    elif "Trần Thị B" in student_name:
         violation_trend = np.linspace(5, 20, N)
         positive_trend = np.linspace(10, 2, N)
+    else:
+        violation_trend = np.full(N, 8) + np.random.normal(0, 2, N)
+        positive_trend = np.full(N, 8) + np.random.normal(0, 2, N)
         
-    else: # Lê Văn C
-        # Ổn định
-        violation_trend = np.full(N, 8) 
-        positive_trend = np.full(N, 8)
-        
-    # Thêm nhiễu ngẫu nhiên (Noise)
-    # np.clip để đảm bảo điểm không bị âm hoặc quá vô lý
     violation_data = np.clip(violation_trend + np.random.normal(0, 2, N), 0, 30).round(1)
     positive_data = np.clip(positive_trend + np.random.normal(0, 2, N), 0, 20).round(1)
 
-    # --- CÔNG THỨC TÍNH ĐIỂM HẠNH KIỂM ---
-    # Điểm Gốc = 90
     base_score = 90
-    conduct_score = base_score + positive_data - violation_data
-    
-    # Giới hạn điểm hạnh kiểm (tối đa 100 nhưng ko dưới 0)
-    conduct_score = np.clip(conduct_score, 0, 100)
+    conduct_score = np.clip(base_score + positive_data - violation_data, 0, 110)
 
     data = {
         'Ngày': dates,
@@ -109,18 +232,9 @@ def generate_behavior_data(student_id):
     df = df.set_index('Ngày')
     return df
 
-# --- Hàm Xử lý và Trực quan hóa ---
-# Định nghĩa công thức tính điểm
-def calculate_score(df):
-    # Tính điểm trung bình dựa trên cột Điểm Hạnh kiểm
-    score = df['Điểm Hạnh kiểm'].mean().round(1)
-    return score
-
 def display_core_analysis(data_df, selected_freq):
-    # --- Logic Nhóm Dữ liệu ---
-    #  Trung bình cho cả 3 cột dữ liệu
+    # (Logic vẽ biểu đồ y như cũ - rút gọn cho đỡ dài dòng)
     cols_to_resample = ['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm']
-    
     if selected_freq == "Ngày (Day)":
         chart_data = data_df[cols_to_resample]
         freq_label = "Ngày"
@@ -130,215 +244,135 @@ def display_core_analysis(data_df, selected_freq):
     elif selected_freq == "Tháng (Month)":
         chart_data = data_df[cols_to_resample].resample('M').mean()
         freq_label = "Tháng"
-        
-    # --- 1. Xác định mốc thời gian ---
+
     current_date = data_df.index.max() 
-    first_day_of_current_month = current_date.replace(day=1)
-    last_day_of_last_month = first_day_of_current_month - datetime.timedelta(days=1)
     
-    # --- 2. Tìm Ngày Gốc (Base Day) ---
-    data_before_current_month = data_df[data_df.index <= last_day_of_last_month]
-    score_last_day = 0 
-    last_day_found = None
-    
-    if not data_before_current_month.empty:
-        last_day_in_last_month = data_before_current_month.index.max()
-        data_base_day = data_df[data_df.index == last_day_in_last_month]
-        score_last_day = calculate_score(data_base_day)
-        last_day_found = last_day_in_last_month.strftime('%d/%m')
-    else:
-        st.error("Không tìm thấy dữ liệu tháng trước để so sánh!")
-        
-    # --- 3. Tính Điểm Ngày Hiện tại ---
+    # Tính điểm ngày hiện tại
     data_current_day = data_df[data_df.index == current_date]
     score_current_day = calculate_score(data_current_day)
     
-    # --- 4. Tính toán sự Chênh lệch ---
-    delta_score = (score_current_day - score_last_day).round(1)
     mean_score = score_current_day 
     
-    # Phân loại Hành vi
     if mean_score >= 90:
-        behavior_class = "A - Tốt"
-        color = "#4CAF50" # Xanh lá
+        behavior_class = "A - Tốt"; color = "#4CAF50"
     elif mean_score >= 80:
-        behavior_class = "B - Khá"
-        color = "#FF9800" # Cam
+        behavior_class = "B - Khá"; color = "#FF9800"
     else:
-        behavior_class = "C - Cần Cải Thiện"
-        color = "#FF4B4B" # Đỏ
+        behavior_class = "C - Cần Cải Thiện"; color = "#FF4B4B"
         
-    # --- 5. Cập nhật st.metric ---
-    st.markdown(f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>**{behavior_class}**</span>", 
-                unsafe_allow_html=True)
+    st.markdown(f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>**{behavior_class}**</span>", unsafe_allow_html=True)
+    st.metric(label=f"Điểm Hạnh kiểm ({freq_label} Hiện tại)", value=f"{mean_score}")
     
-    st.metric(label=f"Điểm Hạnh kiểm ({freq_label} Hiện tại)", 
-              value=f"{mean_score}", 
-              delta=f"{delta_score} điểm so với {last_day_found}", 
-              delta_color="normal")
-    
-    st.markdown(f"*(Điểm gốc ngày {last_day_found}: {score_last_day})*")
-    
-   # --- 6. BIỂU ĐỒ 3 ĐƯỜNG MÀU (ALTAIR) ---
+    # BIỂU ĐỒ ALTAIR
     st.subheader(f"Biểu đồ Xu hướng ({freq_label})")
-    
-    # Chuyển đổi dữ liệu sang dạng Long Format
-    chart_data_long = chart_data.reset_index().melt(
-        'Ngày', var_name='Loại Điểm', value_name='Điểm số'
-    )
+    chart_data_long = chart_data.reset_index().melt('Ngày', var_name='Loại Điểm', value_name='Điểm số')
+    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend', empty=False)
 
-    # 1. TẠO TƯƠNG TÁC (SELECTION)
-    # bind='legend': Cho phép click vào chú thích để chọn
-    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
-
-    # Vẽ biểu đồ Altair
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
         y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
-        
-        # --- MÀU SẮC ---
         color=alt.Color('Loại Điểm:N',
-            scale=alt.Scale(
-                domain=['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm'],
-                range=['#FF4B4B', '#2E8B57', '#1E90FF'] 
-            ),
-            
-            legend=alt.Legend(title="Chú thích (Click để lọc)", orient="bottom")
+            scale=alt.Scale(domain=['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm'], range=['#FF4B4B', '#2E8B57', '#1E90FF']),
+            legend=alt.Legend(title="Chú thích (Click để ẨN/HIỆN)", orient="bottom")
         ),
-        
-        # 2. ĐIỀU KIỆN ẨN/HIỆN
-        # Nếu được chọn (hoặc chưa chọn gì) -> Hiện rõ (1)
-        # Nếu không được chọn -> Mờ đi (0.1)
-        opacity=alt.condition(selection, alt.value(1), alt.value(0.1)),
-        
-        tooltip=[
-            alt.Tooltip('Ngày:T', title='Thời gian', format='%d/%m/%Y'),
-            alt.Tooltip('Loại Điểm:N'),
-            alt.Tooltip('Điểm số:Q', format='.1f')
-        ]
-    ).add_params(
-        selection # 3. THÊM TƯƠNG TÁC VÀO BIỂU ĐỒ
-    ).interactive()
-    
+        opacity=alt.condition(selection, alt.value(0.05), alt.value(1)),
+        tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
+    ).add_params(selection).interactive()
     st.altair_chart(chart, use_container_width=True)
+
+def render_ias_dashboard_page():
+    st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
     
-# --- Hàm Dự đoán và Đề xuất ---
-def display_recommendations(student_id):
-    st.subheader("Dự đoán Xu hướng Tương lai")
+    # Lấy danh sách học sinh TỪ DATABASE (Session State)
+    df_students = st.session_state['df_students']
+    # Tạo list format: "Nguyễn Văn A (HS001)"
+    student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
     
-    # 1. Logic Dự đoán Nguy cơ
-    if "Nguyễn Văn A" in student_id:
-        risk = "Thấp"
-        pred_text = "Hành vi đang có xu hướng cải thiện mạnh mẽ. Nguy cơ thấp. Hệ thống dự đoán điểm số sẽ vượt 80 trong tháng tới."
+    # Xử lý Logic chọn học sinh (Nếu được chuyển từ trang Data sang)
+    default_index = 0
+    if st.session_state['selected_student_id']:
+        # Tìm index của học sinh được chọn
+        ma_hs_target = st.session_state['selected_student_id']
+        # Tìm trong cột MaHS
+        found_row = df_students[df_students['MaHS'] == ma_hs_target]
+        if not found_row.empty:
+            target_string = f"{found_row.iloc[0]['Họ và tên']} ({found_row.iloc[0]['MaHS']})"
+            if target_string in student_options_list:
+                default_index = student_options_list.index(target_string)
+    
+    col1, col2, col3 = st.columns([2, 3, 2.5])
+
+    with col1:
+        st.header("1. Hồ sơ")
+        # Selectbox chọn học sinh (Đã đồng bộ)
+        selected_student_str = st.selectbox(
+            "Học sinh:",
+            student_options_list,
+            index=default_index
+        )
         
-    elif "Trần Thị B" in student_id:
-        risk = "Trung bình"
-        pred_text = "Cần theo dõi chặt chẽ chỉ số Tập trung. Xu hướng đang giảm nhẹ. Hệ thống dự đoán có thể xuất hiện hành vi kém tập trung 2-3 lần/tuần."
+        # Reset trạng thái chọn sau khi đã load xong (để người dùng có thể chọn người khác)
+        st.session_state['selected_student_id'] = None 
         
-    else: # Lê Văn C
-        risk = "Thấp-Trung bình"
-        pred_text = "Hành vi ổn định, nhưng thiếu đột phá. Cần thúc đẩy thêm sự tương tác."
+        if st.button("Tải/Cập nhật Dữ liệu"):
+            st.session_state['data_loaded'] = True
+            st.session_state['current_student_name'] = selected_student_str
+            st.success(f"Đang phân tích: {selected_student_str}")
 
-    st.markdown(f"**Nguy cơ Đánh giá:** <span style='color:orange;'>**{risk}**</span>", unsafe_allow_html=True)
-    st.info(pred_text)
-    
-    st.markdown("---")
-    
-    # 2. Logic Đề xuất Cá nhân hóa
-    st.subheader("Đề xuất Hành động (Nudging)")
-    
-    if "Trần Thị B" in student_id:
-        st.warning("🚨 **Khuyến nghị khẩn cấp:** Cần phân bổ thời gian nghỉ ngơi hợp lý hơn để **cải thiện mức độ tập trung** vào giữa tháng.")
-        st.markdown("*Gợi ý: Tăng thời gian nghỉ giữa giờ học lên 5 phút.*")
-    elif "Nguyễn Văn A" in student_id:
-        st.success("✅ **Khuyến nghị:** Duy trì các hoạt động tương tác nhóm tích cực để **giữ vững phong độ** hiện tại.")
-        st.markdown("*Gợi ý: Tham gia thêm 1 dự án ngoại khóa.*")
-    else:
-        st.info("💡 **Khuyến nghị:** Tạo thêm cơ hội tham gia các hoạt động cần **sự chủ động** để thúc đẩy Tương tác Tích cực.")
-        st.markdown("*Gợi ý: Đăng ký làm trưởng nhóm cho dự án sắp tới.*")
+        st.markdown("---")
+        if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
+            # Lấy thông tin chi tiết từ DB để hiển thị
+            ma_hs_dang_chon = selected_student_str.split('(')[1].replace(')', '')
+            info = df_students[df_students['MaHS'] == ma_hs_dang_chon].iloc[0]
+            
+            st.markdown(f"**Họ tên:** {info['Họ và tên']}")
+            st.markdown(f"**Lớp:** {info['Lớp']}")
+            st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+            
+            # Hiển thị bảng thu gọn
+            st.caption("Dữ liệu tóm tắt từ DB:")
+            st.dataframe(info.to_frame().T, hide_index=True)
+
+    with col2:
+        st.header("2. Phân tích Cốt lõi")
+        selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
         
-# Thiết lập Tiêu đề và Cấu trúc
-st.set_page_config(layout="wide")
+        if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
+            with st.container(height=550, border=False):
+                # Sử dụng hàm giả lập biểu đồ (do dữ liệu thật cần nhập nhiều mới vẽ đẹp)
+                # Nhưng logic dựa trên tên học sinh đã chọn
+                data_chart = generate_behavior_data_mock(st.session_state['current_student_name'])
+                display_core_analysis(data_chart, selected_freq)
+        else:
+            st.info("👈 Nhấn nút Tải dữ liệu.")
 
-st.title("💡 HỆ THỐNG ĐÁNH GIÁ HÀNH VI CÁ NHÂN (IAS)")
-st.caption("Demo dành cho Ban Giám khảo Cuộc thi KHKT")
+    with col3:
+        st.header("3. Đề xuất")
+        if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
+            with st.container(height=550, border=False):
+                st.info("Dựa trên dữ liệu 50 ngày gần nhất...")
+                st.warning("🤖 AI: Cần cải thiện điểm vi phạm vào cuối tuần.")
 
-# Thiết lập Cấu trúc 3 cột chính
-col1, col2, col3 = st.columns([2, 3, 2.5])
+# ==========================================
+# 5. ĐIỀU HƯỚNG CHÍNH (SIDEBAR NAVIGATION)
+# ==========================================
 
-# Nội dung cho cột 1
-with col1:
-    st.header("1. Dữ liệu Đầu vào")
+# Tạo Sidebar để chuyển trang
+with st.sidebar:
+    st.title("MENU HỆ THỐNG")
     
-    # Widget tương tác 1: Chọn Đối tượng
-    selected_student = st.selectbox(
-        "Chọn Đối tượng Phân tích",
-        student_list,
-        index=0 # Chọn học sinh đầu tiên mặc định
+    # Dùng radio button làm menu
+    page_selection = st.radio(
+        "Chọn chức năng:",
+        ["💡 Phân tích IAS", "📂 Quản lý Dữ liệu"],
+        index=0 if st.session_state['current_page'] == 'dashboard' else 1
     )
     
-    # Widget tương tác 2: Nút Tải dữ liệu giả lập
-    if st.button("Tải Dữ liệu Hành vi Mẫu"):
-        st.session_state['data_loaded'] = True
-        st.session_state['current_student'] = selected_student
-        st.success(f"Đã tải dữ liệu của **{selected_student}**.")
-
     st.markdown("---")
-    
-    # Hiển thị dữ liệu khi đã được tải
-    if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
-        st.subheader("Bảng Dữ liệu Đã Chọn")
-        
-        # Gọi hàm giả lập dữ liệu
-        data_df = generate_behavior_data(st.session_state['current_student'])
-        
-        st.dataframe(data_df) 
-        st.markdown(f"*(Tổng cộng {len(data_df)} số ngày theo dõi, đánh giá)*")
-    else:
-        st.info("Vui lòng chọn đối tượng và nhấn nút 'Tải Dữ liệu Mẫu'.")
-            
-# Nội dung cho cột 2
-with col2:
-    st.header("2. Phân tích Hành vi Cốt lõi")
-    
-    # 1. Thanh chọn Tần suất 
-    selected_freq = st.selectbox(
-        label="Xu hướng theo Tần suất:",
-        options=["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"],
-        index=0
-    )
-    
-    # Chỉ hiển thị phân tích khi dữ liệu đã được tải
-    if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
-        with st.container(height=550, border=False):
-            # Lấy dữ liệu đã tải
-            data_df = generate_behavior_data(st.session_state['current_student'])
-            
-            # Gọi hàm xử lý và hiển thị theo tần suất đã chọn
-            display_core_analysis(data_df, selected_freq) 
-        
-    else:
-        st.warning("👈 Vui lòng tải dữ liệu mẫu ở cột bên trái để xem kết quả phân tích.")
-    
-# Nội dung cho cột 3
-with col3:
-    st.header("3. Đề xuất & Dự đoán")
-    
-    if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
-        with st.container(height=550, border=False):
-            # Lấy tên học sinh hiện tại
-            current_student = st.session_state['current_student']
-            
-            # Gọi hàm hiển thị dự đoán và đề xuất
-            display_recommendations(current_student)
-            
-    else:
-        st.warning("👈 Vui lòng tải dữ liệu mẫu để xem đề xuất cá nhân hóa.")
+    st.info("Hệ thống Demo KHKT 2025")
 
-# Phần Footer đơn giản
-
-st.sidebar.success("IAS Demo sẵn sàng.")
-
-
-
-
+# Xử lý hiển thị trang dựa trên lựa chọn
+if page_selection == "💡 Phân tích IAS":
+    render_ias_dashboard_page()
+elif page_selection == "📂 Quản lý Dữ liệu":
+    render_data_management_page()
