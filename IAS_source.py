@@ -62,10 +62,10 @@ def init_db():
         }
         st.session_state['df_violations'] = pd.DataFrame(data_vp)
 
-    # 3. Bảng Danh mục Tích cực
+    # 3. Bảng Danh mục Hoạt động
     if 'df_achievements' not in st.session_state:
         data_tc = {
-            'Tên Tích cực': ['Phát biểu bài', 'Đạt điểm 10', 'Giúp đỡ bạn bè', 'Tham gia CLB', 'Làm việc nhóm tốt'],
+            'Tên Hoạt động': ['Phát biểu bài', 'Đạt điểm 10', 'Giúp đỡ bạn bè', 'Tham gia CLB', 'Làm việc nhóm tốt'],
             'Điểm': [2, 5, 3, 5, 5]
         }
         st.session_state['df_achievements'] = pd.DataFrame(data_tc)
@@ -74,7 +74,7 @@ def init_db():
     if 'df_logs' not in st.session_state:
         # Khởi tạo rỗng hoặc có mẫu, có cột STT
         logs_data = [
-            {'STT': 1, 'Ngày': datetime.date(2025, 1, 2), 'MaHS': 'HS001', 'Loại': 'Tích cực', 'Nội dung': 'Phát biểu bài', 'Điểm': 5, 'Tuần': 1},
+            {'STT': 1, 'Ngày': datetime.date(2025, 1, 2), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Phát biểu bài', 'Điểm': 5, 'Tuần': 1},
             {'STT': 2, 'Ngày': datetime.date(2025, 1, 3), 'MaHS': 'HS002', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 1},
             {'STT': 3, 'Ngày': datetime.date(2025, 1, 16), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Quên vở', 'Điểm': 2, 'Tuần': 3}
         ]
@@ -98,7 +98,7 @@ def render_data_management_page():
         st.subheader("Cấu hình")
         table_option = st.radio(
             "Chọn Bảng Dữ liệu:",
-            ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi", "⚠️ Danh mục Vi phạm", "🏆 Danh mục Tích cực"]
+            ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi", "⚠️ Danh mục Vi phạm", "🏆 Danh mục Hoạt động"]
         )
         st.markdown("---")
         
@@ -123,13 +123,13 @@ def render_data_management_page():
             scores = df_logs_week.groupby(['MaHS', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
             
             if not scores.empty:
-                if 'Tích cực' not in scores.columns: scores['Tích cực'] = 0
+                if 'Hoạt động' not in scores.columns: scores['Hoạt động'] = 0
                 if 'Vi phạm' not in scores.columns: scores['Vi phạm'] = 0
                 df_display = df_display.merge(scores, on='MaHS', how='left').fillna(0)
             else:
-                df_display['Tích cực'] = 0
+                df_display['Hoạt động'] = 0
                 df_display['Vi phạm'] = 0
-            df_display['Hạnh kiểm'] = 90 + df_display['Tích cực'] - df_display['Vi phạm']
+            df_display['Hạnh kiểm'] = 90 + df_display['Hoạt động'] - df_display['Vi phạm']
             
             # Hiển thị
             st.dataframe(
@@ -152,7 +152,7 @@ def render_data_management_page():
             with c2:
                 st.write("")
                 st.write("")
-                if st.button("Phân tích Ngay ▶️", type="primary"):
+                if st.button("Phân tích Ngay", type="primary"):
                     st.session_state['selected_student_id'] = target_hs
                     st.session_state['current_page'] = 'dashboard'
                     st.rerun()
@@ -161,11 +161,11 @@ def render_data_management_page():
         # B. BẢNG NHẬT KÝ HÀNH VI (CRUD NÂNG CAO - HEIDI STYLE)
         # ---------------------------------------------------------
         elif table_option == "📝 Nhật ký Hành vi":
-            st.subheader("📝 Quản lý Nhật ký Hành vi (Liên kết)")
+            st.subheader("📝 Quản lý Nhật ký Hành vi")
 
             # --- 1. FORM NHẬP LIỆU THÔNG MINH (Thay thế cho việc nhập trực tiếp khó khăn) ---
             with st.container():
-                st.markdown("##### ➕ Thêm Nhật ký Mới (Tự động liên kết)")
+                st.markdown("##### ➕ Thêm Nhật ký Mới")
                 
                 # Lấy danh sách Học sinh cho Dropdown
                 list_hs = st.session_state['df_students_master']
@@ -181,7 +181,7 @@ def render_data_management_page():
                 
                 with c_form_2:
                     # Dropdown Loại
-                    new_type = st.selectbox("Loại hành vi", ["Vi phạm", "Tích cực"])
+                    new_type = st.selectbox("Loại hành vi", ["Vi phạm", "Hoạt động"])
                 
                 with c_form_3:
                     # Dropdown Nội dung (Phụ thuộc vào Loại)
@@ -190,7 +190,7 @@ def render_data_management_page():
                         content_col = 'Tên Vi phạm'
                     else:
                         content_source = st.session_state['df_achievements']
-                        content_col = 'Tên Tích cực'
+                        content_col = 'Tên Hoạt động'
                         
                     content_options = content_source[content_col].tolist()
                     new_content = st.selectbox("Nội dung chi tiết", content_options)
@@ -254,10 +254,10 @@ def render_data_management_page():
             # Lưu ý: Sửa trực tiếp trong filter view hơi phức tạp, ở đây demo hiển thị
 
         # ---------------------------------------------------------
-        # C. BẢNG DANH MỤC (VI PHẠM / TÍCH CỰC) - CRUD HOÀN CHỈNH
+        # C. BẢNG DANH MỤC (VI PHẠM / Hoạt động) - CRUD HOÀN CHỈNH
         # ---------------------------------------------------------
         elif table_option == "⚠️ Danh mục Vi phạm":
-            st.subheader("Quản lý Danh mục Vi phạm (Toàn hệ thống)")
+            st.subheader("Quản lý Danh mục Vi phạm")
             st.info("💡 Bảng này là bảng Tĩnh, dùng chung cho cả năm học.")
             
             edited_vp = st.data_editor(
@@ -271,8 +271,8 @@ def render_data_management_page():
                 st.session_state['df_violations'] = edited_vp
                 st.rerun()
 
-        elif table_option == "🏆 Danh mục Tích cực":
-            st.subheader("Quản lý Danh mục Tích cực (Toàn hệ thống)")
+        elif table_option == "🏆 Danh mục Hoạt động":
+            st.subheader("Quản lý Danh mục Hoạt động")
             st.info("💡 Bảng này là bảng Tĩnh, dùng chung cho cả năm học.")
             
             edited_tc = st.data_editor(
@@ -307,13 +307,13 @@ def generate_behavior_data_mock(student_name):
     positive_data = np.clip(positive_trend + np.random.normal(0, 2, N), 0, 20).round(1)
     base_score = 90
     conduct_score = np.clip(base_score + positive_data - violation_data, 0, 120)
-    data = {'Ngày': dates, 'Điểm Vi phạm': violation_data, 'Điểm Tích cực': positive_data, 'Điểm Hạnh kiểm': conduct_score}
+    data = {'Ngày': dates, 'Điểm Vi phạm': violation_data, 'Điểm Hoạt động': positive_data, 'Điểm Hạnh kiểm': conduct_score}
     df = pd.DataFrame(data)
     df = df.set_index('Ngày')
     return df
 
 def display_core_analysis(data_df, selected_freq):
-    cols_to_resample = ['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm']
+    cols_to_resample = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
     if selected_freq == "Ngày (Day)": chart_data = data_df[cols_to_resample]; freq_label = "Ngày"
     elif selected_freq == "Tuần (Week)": chart_data = data_df[cols_to_resample].resample('W').mean(); freq_label = "Tuần"
     elif selected_freq == "Tháng (Month)": chart_data = data_df[cols_to_resample].resample('M').mean(); freq_label = "Tháng"
@@ -335,7 +335,7 @@ def display_core_analysis(data_df, selected_freq):
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
         y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
-        color=alt.Color('Loại Điểm:N', scale=alt.Scale(domain=['Điểm Vi phạm', 'Điểm Tích cực', 'Điểm Hạnh kiểm'], range=['#FF4B4B', '#2E8B57', '#1E90FF']), legend=alt.Legend(title="Chú thích", orient="bottom")),
+        color=alt.Color('Loại Điểm:N', scale=alt.Scale(domain=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'], range=['#FF4B4B', '#2E8B57', '#1E90FF']), legend=alt.Legend(title="Chú thích", orient="bottom")),
         opacity=alt.condition(selection, alt.value(0.05), alt.value(1)), tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
     ).add_params(selection).interactive()
     st.altair_chart(chart, use_container_width=True)
@@ -375,7 +375,7 @@ def render_ias_dashboard_page():
         st.header("3. Đề xuất")
         if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
             with st.container(height=550, border=False):
-                st.info("Dựa trên dữ liệu 50 ngày gần nhất..."); st.success("🤖 AI: Học sinh đang có xu hướng tích cực.")
+                st.info("Dựa trên dữ liệu 50 ngày gần nhất..."); st.success("🤖 AI: Học sinh đang có xu hướng Hoạt động.")
 
 # ==========================================
 # 5. ĐIỀU HƯỚNG CHÍNH
