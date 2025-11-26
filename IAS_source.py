@@ -308,7 +308,7 @@ def generate_behavior_data_mock(student_name):
     violation_data = np.clip(violation_trend + np.random.normal(0, 2, N), 0, 30).round(1)
     positive_data = np.clip(positive_trend + np.random.normal(0, 2, N), 0, 20).round(1)
     base_score = 90
-    conduct_score = np.clip(base_score + positive_data - violation_data, 0, 120)
+    conduct_score = np.clip(base_score + positive_data - violation_data, 0, 100)
     data = {'Ngày': dates, 'Điểm Vi phạm': violation_data, 'Điểm Hoạt động': positive_data, 'Điểm Hạnh kiểm': conduct_score}
     df = pd.DataFrame(data)
     df = df.set_index('Ngày')
@@ -401,3 +401,4 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
