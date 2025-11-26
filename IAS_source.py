@@ -155,8 +155,8 @@ def render_data_management_page():
                 if st.button("Phân tích Ngay", type="primary"):
                     st.session_state['selected_student_id'] = target_hs
                     st.session_state['current_page'] = 'dashboard'
-                    st.session_state['nav_radio'] = "💡 Phân tích IAS"  # cập nhật trạng thái radio
                     st.rerun()
+
 
 
         # ---------------------------------------------------------
@@ -387,19 +387,18 @@ def on_nav_change():
         st.session_state['current_page'] = 'dashboard'
     else:
         st.session_state['current_page'] = 'data_mgmt'
-        
+
 with st.sidebar:
     st.title("MENU HỆ THỐNG")
-
     st.radio(
         "Chọn chức năng:",
         ["💡 Phân tích IAS", "📂 Quản lý Dữ liệu"],
         key="nav_radio",
         on_change=on_nav_change
     )
-
     st.markdown("---")
     st.info("Demo KHKT 2025")
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
