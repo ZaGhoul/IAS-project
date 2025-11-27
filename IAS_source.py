@@ -230,10 +230,6 @@ def render_data_management_page():
 # 4. LOGIC TRANG 2: DASHBOARD IAS
 # ==========================================
 def build_behavior_dataset(ma_hs, week_selected):
-    """
-    Trả về DataFrame gồm 7 ngày trong tuần week_selected
-    với các cột: 'Ngày', 'Vi phạm', 'Hoạt động', 'Hạnh kiểm'
-    """
     df_logs = st.session_state['df_logs'].copy()
     df_logs['Ngày'] = pd.to_datetime(df_logs['Ngày'], errors='coerce')
     df_logs = df_logs.dropna(subset=['Ngày'])
@@ -252,28 +248,28 @@ def build_behavior_dataset(ma_hs, week_selected):
 
     # Lọc nhật ký trong tuần
     logs_week = df_logs[df_logs['Tuần'] == week_selected]
-
     if not logs_week.empty:
-        # Tổng hợp theo ngày và loại
         daily_scores = logs_week.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
 
-        # Đảm bảo có 2 cột Vi phạm và Hoạt động
+        # đảm bảo có cả 2 cột
         for col in ['Vi phạm', 'Hoạt động']:
             if col not in daily_scores.columns:
                 daily_scores[col] = 0
 
-        # Reset index để merge theo cột 'Ngày'
+        # Ép kiểu ngày để merge chính xác
         daily_scores = daily_scores.reset_index()
+        daily_scores['Ngày'] = pd.to_datetime(daily_scores['Ngày'])
 
-        # Merge vào dataset
+        # Merge
         dataset = dataset.merge(daily_scores[['Ngày','Vi phạm','Hoạt động']], on='Ngày', how='left')
 
-        # Fill na và tính hạnh kiểm
+        # Fill na và tính Hạnh kiểm
         dataset['Vi phạm'] = dataset['Vi phạm'].fillna(0)
         dataset['Hoạt động'] = dataset['Hoạt động'].fillna(0)
         dataset['Hạnh kiểm'] = 90 + dataset['Hoạt động'] - dataset['Vi phạm']
 
     return dataset
+
 
 
 def calculate_score(df):
@@ -458,6 +454,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
