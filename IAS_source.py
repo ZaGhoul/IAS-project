@@ -253,8 +253,7 @@ def render_data_management_page():
                 }
             )
             
-            # Logic Cập nhật lại Session State khi sửa/xóa dưới bảng
-            # Lưu ý: Sửa trực tiếp trong filter view hơi phức tạp, ở đây demo hiển thị
+            # Logic Cập nhật Session State khi sửa/xóa dưới bảng
 
         # ---------------------------------------------------------
         # C. BẢNG DANH MỤC (VI PHẠM / Hoạt động) - CRUD HOÀN CHỈNH
@@ -291,6 +290,35 @@ def render_data_management_page():
 # ==========================================
 # 4. LOGIC TRANG 2: DASHBOARD IAS
 # ==========================================
+def build_behavior_dataset(ma_hs, week_selected=None):
+    df_logs = st.session_state['df_logs']
+
+    # Chỉ lấy dữ liệu học sinh này
+    df = df_logs[df_logs['MaHS'] == ma_hs].copy()
+
+    if df.empty:
+        return pd.DataFrame(columns=['Ngày', 'Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']).set_index('Ngày')
+
+    # Nếu chọn tuần → lọc dữ liệu theo tuần
+    if week_selected:
+        df = df[df['Tuần'] == week_selected]
+
+    if df.empty:
+        # Tạo dataset rỗng để không lỗi
+        return pd.DataFrame(columns=['Ngày', 'Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']).set_index('Ngày')
+
+    # Gom điểm theo ngày
+    df_group = df.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
+
+    if 'Vi phạm' not in df_group.columns:
+        df_group['Vi phạm'] = 0
+    if 'Hoạt động' not in df_group.columns:
+        df_group['Hoạt động'] = 0
+
+    df_group = df_group.rename(columns={'Vi phạm': 'Điểm Vi phạm', 'Hoạt động': 'Điểm Hoạt động'})
+    df_group['Điểm Hạnh kiểm'] = 90 + df_group['Điểm Hoạt động'] - df_group['Điểm Vi phạm']
+
+    return df_group
 
 def calculate_score(df):
     score = df['Điểm Hạnh kiểm'].mean().round(1)
@@ -316,34 +344,65 @@ def generate_behavior_data_mock(student_name):
     return df
 
 def display_core_analysis(data_df, selected_freq):
-    cols_to_resample = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
-    if selected_freq == "Ngày (Day)": chart_data = data_df[cols_to_resample]; freq_label = "Ngày"
-    elif selected_freq == "Tuần (Week)": chart_data = data_df[cols_to_resample].resample('W').mean(); freq_label = "Tuần"
-    elif selected_freq == "Tháng (Month)": chart_data = data_df[cols_to_resample].resample('M').mean(); freq_label = "Tháng"
+    cols = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
 
-    current_date = data_df.index.max() 
-    data_current_day = data_df[data_df.index == current_date]
-    mean_score = calculate_score(data_current_day)
-    
-    if mean_score >= 90: behavior_class = "A - Tốt"; color = "#4CAF50"
-    elif mean_score >= 80: behavior_class = "B - Khá"; color = "#FF9800"
-    else: behavior_class = "C - Cần Cải Thiện"; color = "#FF4B4B"
-        
+    # Nếu không có data -> thông báo
+    if data_df.empty:
+        st.info("⛔ Không có dữ liệu trong tuần này.")
+        return
+
+    # Resample
+    if selected_freq == "Ngày (Day)":
+        chart_data = data_df[cols]
+        freq_label = "Ngày"
+    elif selected_freq == "Tuần (Week)":
+        chart_data = data_df[cols].resample('W').mean()
+        freq_label = "Tuần"
+    else:
+        chart_data = data_df[cols].resample('M').mean()
+        freq_label = "Tháng"
+
+    # Lấy ngày cuối để tính xếp loại
+    current_day = data_df.index.max()
+    mean_score = data_df.loc[current_day, 'Điểm Hạnh kiểm']
+
+    # Phân loại
+    if mean_score >= 90:
+        behavior_class = "A - Tốt"; color = "#4CAF50"
+    elif mean_score >= 80:
+        behavior_class = "B - Khá"; color = "#FF9800"
+    else:
+        behavior_class = "C - Cần Cải Thiện"; color = "#FF4B4B"
+
     st.markdown(f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>**{behavior_class}**</span>", unsafe_allow_html=True)
     st.metric(label=f"Điểm Hạnh kiểm ({freq_label} Hiện tại)", value=f"{mean_score}")
-    
+
+    # Biểu đồ
     st.subheader(f"Biểu đồ Xu hướng ({freq_label})")
     chart_data_long = chart_data.reset_index().melt('Ngày', var_name='Loại Điểm', value_name='Điểm số')
-    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend', empty=True)
-    chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
-        x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
-        y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
-        color=alt.Color('Loại Điểm:N', scale=alt.Scale(domain=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'], range=['#FF4B4B', '#2E8B57', '#1E90FF']), legend=alt.Legend(title="Chú thích", orient="bottom")),
-        opacity=alt.condition(selection, alt.value(1), alt.value(0.05)), tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
-    ).add_params(selection).interactive()
+    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
+    chart = (
+        alt.Chart(chart_data_long)
+        .mark_line(point=True, strokeWidth=3)
+        .encode(
+            x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")),
+            y=alt.Y('Điểm số:Q', title=None),
+            color='Loại Điểm:N',
+            opacity=alt.condition(selection, alt.value(1), alt.value(0.15)),
+            tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
+        )
+        .add_params(selection)
+        .interactive()
+    )
+
     st.altair_chart(chart, use_container_width=True)
 
+
 def render_ias_dashboard_page():
+    week_selected = st.session_state.get('selected_week', 3)
+    data_chart = build_behavior_dataset(ma_hs, week_selected)
+    display_core_analysis(data_chart, selected_freq)
+    
     st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
@@ -416,6 +475,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
