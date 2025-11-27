@@ -148,8 +148,7 @@ def render_data_management_page():
             scores = logs_week.groupby(['MaHS', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
             if not scores.empty:
                 for col in ['Hoạt động', 'Vi phạm']:
-                    if col not in scores.columns:
-                        scores[col] = 0
+                    if col not in scores.columns: scores[col] = 0
                 df_students = df_students.merge(scores, on='MaHS', how='left').fillna(0)
             else:
                 df_students['Hoạt động'] = 0
@@ -160,9 +159,7 @@ def render_data_management_page():
             st.dataframe(
                 df_students, use_container_width=True, hide_index=True,
                 column_config={
-                    "Hạnh kiểm": st.column_config.ProgressColumn(
-                        "Hạnh kiểm", format="%d", min_value=0, max_value=120
-                    )
+                    "Hạnh kiểm": st.column_config.ProgressColumn("Hạnh kiểm", format="%d", min_value=0, max_value=120)
                 }
             )
 
@@ -171,8 +168,8 @@ def render_data_management_page():
         # ===================
         elif table_option == "📝 Nhật ký Hành vi":
             st.subheader(f"📝 Quản lý Nhật ký Hành vi Tuần {selected_week}")
-            df_logs = st.session_state['df_logs'].copy()
-        
+            df_logs = st.session_state['df_logs']
+
             # --- Thêm nhật ký mới ---
             st.markdown("##### ➕ Thêm Nhật ký Mới")
             df_students = st.session_state['df_students_master']
@@ -186,41 +183,23 @@ def render_data_management_page():
             new_score = st.number_input("Điểm", value=auto_score)
             new_date = st.date_input("Ngày", datetime.date.today())
             new_week = new_date.isocalendar()[1]
-        
+
             if st.button("💾 Lưu vào CSDL"):
                 # Tạo STT
                 next_stt = df_logs['STT'].max() + 1 if not df_logs.empty else 1
-                new_row = {
-                    'STT': next_stt,
-                    'Ngày': pd.Timestamp(new_date),
-                    'MaHS': str(new_mahs),
-                    'Loại': str(new_type),
-                    'Nội dung': str(new_content),
-                    'Điểm': float(new_score),
-                    'Tuần': int(new_week)
-                }
+                new_row = {'STT': next_stt, 'Ngày': new_date, 'MaHS': new_mahs,
+                           'Loại': new_type, 'Nội dung': new_content, 'Điểm': new_score,
+                           'Tuần': new_week}
                 df_logs = pd.concat([df_logs, pd.DataFrame([new_row])], ignore_index=True)
                 st.session_state['df_logs'] = df_logs
                 # Lưu ra CSV để reload không mất
                 df_logs.to_csv("logs.csv", index=False)
                 st.success("Đã thêm mới thành công!")
                 st.experimental_rerun()
-        
-            # --- Hiển thị bảng nhật ký ---
-            logs_week = df_logs[df_logs['Tuần'] == selected_week].copy()
-        
-            # ---- Fix kiểu dữ liệu cho Streamlit ----
-            logs_week['STT'] = logs_week['STT'].astype(int)
-            logs_week['MaHS'] = logs_week['MaHS'].astype(str)
-            logs_week['Loại'] = logs_week['Loại'].astype(str)
-            logs_week['Nội dung'] = logs_week['Nội dung'].astype(str)
-            logs_week['Điểm'] = logs_week['Điểm'].fillna(0).astype(float)
-            logs_week['Tuần'] = logs_week['Tuần'].astype(int)
-            # --- fix ValueError nếu dữ liệu trộn string + Timestamp ---
-            logs_week['Ngày'] = pd.to_datetime(logs_week['Ngày'], errors='coerce').dt.strftime('%Y-%m-%d')
-        
-            st.dataframe(logs_week, use_container_width=True)
 
+            # --- Hiển thị bảng nhật ký ---
+            logs_week = df_logs[df_logs['Tuần'] == selected_week]
+            st.dataframe(logs_week, use_container_width=True)
 
         # ===================
         # C. Danh mục Vi phạm / Hoạt động
@@ -238,7 +217,6 @@ def render_data_management_page():
             if not edited_tc.equals(st.session_state['df_achievements']):
                 st.session_state['df_achievements'] = edited_tc
                 st.experimental_rerun()
-
 
 
 # ==========================================
@@ -315,128 +293,111 @@ def generate_behavior_data_mock(student_name):
     return df
 
 def display_core_analysis(data_df, selected_freq, week_selected=None):
-    """
-    Hiển thị biểu đồ hành vi học sinh.
-    - data_df: DataFrame có index là Ngày, các cột: Điểm Vi phạm, Điểm Hoạt động, Điểm Hạnh kiểm
-    - selected_freq: "Ngày (Day)", "Tuần (Week)", "Tháng (Month)"
-    - week_selected: số tuần nếu muốn lọc tuần cụ thể
-    """
     cols = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
 
     if data_df.empty:
         st.info("⛔ Không có dữ liệu trong tuần này.")
         return
 
-    chart_data = data_df.copy()
+    df_plot = data_df.copy()
 
-    # --- Lọc tuần nếu có ---
-    if week_selected is not None:
-        # Lấy đầu và cuối tuần
-        first_day_of_week = pd.to_datetime(f'2025-01-01') + pd.to_timedelta((week_selected-1)*7, unit='D')
-        last_day_of_week = first_day_of_week + pd.Timedelta(days=6)
-        # Lọc các ngày trong tuần đó
-        all_days = pd.date_range(start=first_day_of_week, end=last_day_of_week)
-        chart_data = chart_data.reindex(all_days, fill_value=0)
-        chart_data.index.name = 'Ngày'
-        # Nếu ngày không có log, điểm hạnh kiểm = 90
-        chart_data['Điểm Hạnh kiểm'] = chart_data['Điểm Hạnh kiểm'].replace(0, 90)
+    # Lọc theo tuần cụ thể nếu cần
+    if week_selected:
+        df_plot = df_plot[df_plot.index.isocalendar().week == week_selected]
+
+    df_plot = df_plot.sort_index()
+
+    # Chuyển index thành string để Altair hiển thị chuẩn
+    df_plot_for_chart = df_plot.copy()
+    df_plot_for_chart.index = df_plot_for_chart.index.strftime('%d/%m')
+
+    if selected_freq == "Ngày (Day)" or (selected_freq == "Tuần (Week)" and week_selected):
+        chart_data = df_plot_for_chart[cols]
+        x_label = "Ngày"
+    elif selected_freq == "Tuần (Week)":
+        chart_data = df_plot[cols].groupby(df_plot.index.isocalendar().week).mean()
+        chart_data.index = [f"Tuần {w}" for w in chart_data.index]
+        x_label = "Tuần"
+    else:  # Tháng
+        chart_data = df_plot.resample('M').mean()
+        chart_data.index = chart_data.index.strftime('%m/%Y')
+        x_label = "Tháng"
+
+    current_score = chart_data['Điểm Hạnh kiểm'].iloc[-1]
+
+    if current_score >= 90:
+        behavior_class, color = "A - Tốt", "#4CAF50"
+    elif current_score >= 80:
+        behavior_class, color = "B - Khá", "#FF9800"
     else:
-        chart_data.index.name = 'Ngày'
-        chart_data['Điểm Hạnh kiểm'] = chart_data['Điểm Hạnh kiểm'].replace(0, 90)
+        behavior_class, color = "C - Cần Cải Thiện", "#FF4B4B"
 
-    # --- Resample nếu tần suất là Tuần/Tháng ---
-    if selected_freq == "Tuần (Week)":
-        chart_data = chart_data.resample('D').asfreq()  # đảm bảo tất cả ngày có
-        freq_label = f"Tuần {week_selected}"
-    elif selected_freq == "Tháng (Month)":
-        chart_data = chart_data.resample('M').mean()
-        freq_label = chart_data.index.max().strftime("%B %Y")
-    else:
-        freq_label = "Ngày"
-
-    # --- Lấy ngày cuối cùng để xếp loại ---
-    current_day = chart_data.index.max()
-    mean_score = chart_data.loc[current_day, 'Điểm Hạnh kiểm']
-
-    if mean_score >= 90:
-        behavior_class = "A - Tốt"; color = "#4CAF50"
-    elif mean_score >= 80:
-        behavior_class = "B - Khá"; color = "#FF9800"
-    else:
-        behavior_class = "C - Cần Cải Thiện"; color = "#FF4B4B"
-
-    st.markdown(f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>**{behavior_class}**</span>", unsafe_allow_html=True)
-    st.metric(label=f"Điểm Hạnh kiểm ({freq_label} hiện tại)", value=f"{mean_score}")
-
-    # --- Chuẩn bị dữ liệu dài để vẽ Altair ---
-    chart_data_reset = chart_data.reset_index()
-    chart_data_long = chart_data_reset.melt(
-        id_vars='Ngày',
-        value_vars=cols,
-        var_name='Loại Điểm',
-        value_name='Điểm số'
+    st.markdown(
+        f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>{behavior_class}</span>",
+        unsafe_allow_html=True
     )
+    st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score}")
+
+    # Biểu đồ
+    chart_data_long = chart_data.reset_index().melt(chart_data.index.name or 'Ngày', var_name='Loại Điểm', value_name='Điểm số')
+    chart_data_long.rename(columns={chart_data.index.name or 'Ngày': 'Ngày'}, inplace=True)
 
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
     chart = (
         alt.Chart(chart_data_long)
         .mark_line(point=True, strokeWidth=3)
         .encode(
-            x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")),
+            x=alt.X('Ngày:N', title=x_label),
             y=alt.Y('Điểm số:Q', title=None),
             color='Loại Điểm:N',
             opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
-            tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
+            tooltip=['Ngày:N', 'Loại Điểm', 'Điểm số']
         )
         .add_params(selection)
         .interactive()
     )
-    st.subheader(f"Biểu đồ Xu hướng ({freq_label})")
     st.altair_chart(chart, use_container_width=True)
-
 
 
 def render_ias_dashboard_page():
     st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
-    
+
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
     default_index = 0
-
-    # --- Lấy học sinh đã chọn trước đó ---
     if st.session_state.get('selected_student_id'):
         ma_hs_target = st.session_state['selected_student_id']
         found_row = df_students[df_students['MaHS'] == ma_hs_target]
         if not found_row.empty:
             target_string = f"{found_row.iloc[0]['Họ và tên']} ({found_row.iloc[0]['MaHS']})"
-            if target_string in student_options_list:
+            if target_string in student_options_list: 
                 default_index = student_options_list.index(target_string)
 
     col1, col2, col3 = st.columns([2,3,2.5])
 
-    # --- Cột 1: Hồ sơ ---
+    # --------------------- CỘT 1: Hồ sơ ---------------------
     with col1:
         st.header("1. Hồ sơ")
         selected_student_str = st.selectbox("Học sinh:", student_options_list, index=default_index)
         ma_hs = selected_student_str.split('(')[1].replace(')', '')
         st.session_state['selected_student_id'] = ma_hs
 
-        week_selected = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3)
+        week_selected = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=st.session_state.get('selected_week', 3))
+        st.session_state['selected_week'] = week_selected
 
         info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
         st.markdown(f"**Họ tên:** {info['Họ và tên']}")
         st.markdown(f"**Lớp:** {info['Lớp']}")
         st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
 
-    # --- Cột 2: Phân tích cốt lõi ---
+    # --------------------- CỘT 2: Phân tích cốt lõi ---------------------
     with col2:
         st.header("2. Phân tích Cốt lõi")
-        selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
-        # Lấy dữ liệu build_behavior_dataset mới
+        selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"], key="freq_select")
         data_chart = build_behavior_dataset(ma_hs, week_selected)
         display_core_analysis(data_chart, selected_freq, week_selected=week_selected)
 
-    # --- Cột 3: Đề xuất ---
+    # --------------------- CỘT 3: Đề xuất ---------------------
     with col3:
         st.header("3. Đề xuất")
         if not data_chart.empty:
@@ -477,8 +438,6 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
-
-
 
 
 
