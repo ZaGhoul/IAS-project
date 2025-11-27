@@ -296,7 +296,7 @@ def calculate_score(df):
     return score
 
 def generate_behavior_data_mock(student_name):
-    # (Logic giả lập giữ nguyên để vẽ biểu đồ đẹp)
+    # (Logic giả lập để vẽ biểu đồ đẹp)
     N = 50 
     dates = pd.date_range(end=datetime.date.today(), periods=N, freq='D')
     if "Nguyễn Văn A" in student_name:
@@ -333,12 +333,12 @@ def display_core_analysis(data_df, selected_freq):
     
     st.subheader(f"Biểu đồ Xu hướng ({freq_label})")
     chart_data_long = chart_data.reset_index().melt('Ngày', var_name='Loại Điểm', value_name='Điểm số')
-    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend', empty=true)
+    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
         y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
         color=alt.Color('Loại Điểm:N', scale=alt.Scale(domain=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'], range=['#FF4B4B', '#2E8B57', '#1E90FF']), legend=alt.Legend(title="Chú thích", orient="bottom")),
-        opacity=alt.condition(selection, alt.value(1), alt.value(0.05)), tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
+        opacity=alt.condition(selection | alt.datum.Loại_Điểm == None, alt.value(1), alt.value(0.05)), tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
     ).add_params(selection).interactive()
     st.altair_chart(chart, use_container_width=True)
 
@@ -401,6 +401,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
