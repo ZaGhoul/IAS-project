@@ -377,7 +377,21 @@ def render_ias_dashboard_page():
         st.header("3. Đề xuất")
         if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
             with st.container(height=550, border=False):
-                st.info("Dựa trên tần suất vi phạm và hoạt động"); st.success("🤖 AI: Học sinh đang có xu hướng Hoạt động.")
+                st.info("Dựa trên tần suất vi phạm và hoạt động"); 
+                st.success("🤖 AI: Học sinh đang có xu hướng Hoạt động. (Dự định tương lai)")
+                suggestions = [
+                    "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
+                    "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
+                    "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
+                    "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
+                    "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
+                    "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
+                    "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
+                    "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
+                    "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
+                ]
+                ai_suggestion = random.choice(suggestions)
+                st.success(f"🤖 AI: Đề xuất:" {ai_suggestion} (Dự định tương lai)")
 
 # ==========================================
 # 5. ĐIỀU HƯỚNG CHÍNH
@@ -401,6 +415,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
