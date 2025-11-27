@@ -446,7 +446,8 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
         return
         
     # FIX: Dùng average (mean) của Hạnh kiểm để tính Xếp loại.
-    current_score = chart_data['Điểm Hạnh kiểm'].mean().round(1) 
+    # current_score = chart_data['Điểm Hạnh kiểm'].mean().round(1) 
+    current_score = chart_data['Điểm Hạnh kiểm'].tail(1).iloc[0].round(1)
 
     if current_score >= 90:
         behavior_class, color = "A - Tốt", "#4CAF50"
@@ -565,6 +566,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
