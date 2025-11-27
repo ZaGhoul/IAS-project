@@ -392,7 +392,7 @@ def render_ias_dashboard_page():
                     "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
                 ]
                 ai_suggestion = random.choice(suggestions)
-                st.success(f"🤖 AI: Đề xuất:" {ai_suggestion} (Dự định tương lai)")
+                st.success(f"🤖 AI: Đề xuất: {ai_suggestion} (Dự định tương lai)")
 
 # ==========================================
 # 5. ĐIỀU HƯỚNG CHÍNH
@@ -416,6 +416,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
