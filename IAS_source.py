@@ -87,23 +87,29 @@ def init_db():
             st.session_state['df_achievements'].to_csv("achievements.csv", index=False)
 
     # 4. Nhật ký Hành vi
+    # Kiểm tra nếu DataFrame chưa tồn tại trong session_state
     if 'df_logs' not in st.session_state:
-        try:
-            st.session_state['df_logs'] = pd.read_csv("logs.csv", parse_dates=['Ngày'])
-        except FileNotFoundError:
-            logs_data = [
-                {'STT': 1, 'Ngày': pd.to_datetime('2025-01-02'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Phát biểu bài', 'Điểm': 5, 'Tuần': 1},
-                {'STT': 2, 'Ngày': pd.to_datetime('2025-01-03'), 'MaHS': 'HS002', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 1},
-                {'STT': 3, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Quên vở', 'Điểm': 2, 'Tuần': 3},
-                {'STT': 4, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không làm bài tập', 'Điểm': 5, 'Tuần': 3},
-                {'STT': 5, 'Ngày': pd.to_datetime('2025-01-17'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 3},
-                {'STT': 6, 'Ngày': pd.to_datetime('2025-01-18'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không trực nhật', 'Điểm': 5, 'Tuần': 3},
-                {'STT': 7, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Đạt điểm 10', 'Điểm': 5, 'Tuần': 3},
-                {'STT': 8, 'Ngày': pd.to_datetime('2025-01-17'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Giúp đỡ bạn bè', 'Điểm': 3, 'Tuần': 3},
-                {'STT': 9, 'Ngày': pd.to_datetime('2025-01-18'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Tham gia CLB', 'Điểm': 5, 'Tuần': 3}
-            ]
-            st.session_state['df_logs'] = pd.DataFrame(logs_data)
-            st.session_state['df_logs'].to_csv("logs.csv", index=False)
+        
+        # 1. Khai báo dữ liệu mẫu cố định
+        logs_data = [
+            {'STT': 1, 'Ngày': pd.to_datetime('2025-01-02'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Phát biểu bài', 'Điểm': 5, 'Tuần': 1},
+            {'STT': 2, 'Ngày': pd.to_datetime('2025-01-03'), 'MaHS': 'HS002', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 1},
+            {'STT': 3, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Quên vở', 'Điểm': 2, 'Tuần': 3},
+            {'STT': 4, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không làm bài tập', 'Điểm': 5, 'Tuần': 3},
+            {'STT': 5, 'Ngày': pd.to_datetime('2025-01-17'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 3},
+            {'STT': 6, 'Ngày': pd.to_datetime('2025-01-18'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không trực nhật', 'Điểm': 5, 'Tuần': 3},
+            {'STT': 7, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Đạt điểm 10', 'Điểm': 5, 'Tuần': 3},
+            {'STT': 8, 'Ngày': pd.to_datetime('2025-01-17'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Giúp đỡ bạn bè', 'Điểm': 3, 'Tuần': 3},
+            {'STT': 9, 'Ngày': pd.to_datetime('2025-01-18'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Tham gia CLB', 'Điểm': 5, 'Tuần': 3}
+        ]
+    
+        # 2. Tạo DataFrame từ dữ liệu mẫu
+        st.session_state['df_logs'] = pd.DataFrame(logs_data)
+        
+        # 3. Ghi DataFrame này ra file logs.csv (để nó tồn tại cho lần chạy sau, 
+        # Mặc dù bạn nói không muốn đọc file, nhưng việc ghi lại giúp dữ liệu này 
+        # được lưu trữ vật lý nếu bạn muốn sử dụng nó sau này.)
+        st.session_state['df_logs'].to_csv("logs.csv", index=False)
 
     if 'current_page' not in st.session_state:
         st.session_state['current_page'] = 'dashboard'
@@ -557,6 +563,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
