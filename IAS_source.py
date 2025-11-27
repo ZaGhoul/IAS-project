@@ -347,8 +347,8 @@ def generate_behavior_data_mock(student_name):
 def display_core_analysis(data_df, selected_freq, week_selected=None):
     """
     Hiển thị biểu đồ điểm Vi phạm / Hoạt động / Hạnh kiểm.
-    Hỗ trợ Ngày, Tuần, Tháng.
-    Nếu week_selected được truyền, chỉ hiển thị dữ liệu tuần đó.
+    Hỗ trợ Ngày / Tuần / Tháng.
+    Khi chọn tuần, hiển thị đủ 7 ngày trong tuần đó.
     """
     cols = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
 
@@ -356,14 +356,18 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
         st.info("⛔ Không có dữ liệu trong tuần này.")
         return
 
-    # Resample theo tần suất
     df_plot = data_df.copy()
-    
-    if selected_freq == "Ngày (Day)":
+
+    # Nếu chọn tuần cụ thể → lọc 7 ngày trong tuần đó
+    if week_selected:
+        df_plot = df_plot[df_plot.index.isocalendar().week == week_selected]
+
+    if selected_freq == "Ngày (Day)" or (selected_freq == "Tuần (Week)" and week_selected):
+        # Hiển thị theo từng ngày
         chart_data = df_plot[cols]
         x_label = "Ngày"
     elif selected_freq == "Tuần (Week)":
-        # Nếu dữ liệu đã được lọc theo tuần, lấy theo ngày
+        # Trung bình tuần (nhiều tuần)
         chart_data = df_plot[cols].groupby(df_plot.index.isocalendar().week).mean()
         chart_data.index = [f"Tuần {w}" for w in chart_data.index]
         x_label = "Tuần"
@@ -371,11 +375,8 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
         chart_data = df_plot[cols].resample('M').mean()
         x_label = "Tháng"
 
-    # Lấy điểm cuối cùng (hoặc trung bình tuần/ tháng)
-    if selected_freq == "Ngày (Day)":
-        current_score = df_plot['Điểm Hạnh kiểm'].iloc[-1]
-    else:
-        current_score = chart_data['Điểm Hạnh kiểm'].iloc[-1]
+    # Điểm cuối cùng dùng để xếp loại
+    current_score = chart_data['Điểm Hạnh kiểm'].iloc[-1]
 
     # Phân loại hạnh kiểm
     if current_score >= 90:
@@ -392,7 +393,7 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
     st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score}")
 
     # Biểu đồ Altair
-    chart_data_long = chart_data.reset_index().melt(id_vars=chart_data.index.name or 'index', var_name='Loại Điểm', value_name='Điểm số')
+    chart_data_long = chart_data.reset_index().melt(chart_data.index.name or 'index', var_name='Loại Điểm', value_name='Điểm số')
     chart_data_long.rename(columns={chart_data.index.name or 'index': 'Ngày'}, inplace=True)
 
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
@@ -492,5 +493,6 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
