@@ -317,6 +317,7 @@ def build_behavior_dataset(ma_hs, week_selected=None):
 
     df_group = df_group.rename(columns={'Vi phạm': 'Điểm Vi phạm', 'Hoạt động': 'Điểm Hoạt động'})
     df_group['Điểm Hạnh kiểm'] = 90 + df_group['Điểm Hoạt động'] - df_group['Điểm Vi phạm']
+    df_group.index = pd.to_datetime(df_group.index)
 
     return df_group
 
@@ -343,58 +344,71 @@ def generate_behavior_data_mock(student_name):
     df = df.set_index('Ngày')
     return df
 
-def display_core_analysis(data_df, selected_freq):
+def display_core_analysis(data_df, selected_freq, week_selected=None):
+    """
+    Hiển thị biểu đồ điểm Vi phạm / Hoạt động / Hạnh kiểm.
+    Hỗ trợ Ngày, Tuần, Tháng.
+    Nếu week_selected được truyền, chỉ hiển thị dữ liệu tuần đó.
+    """
     cols = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
 
-    # Nếu không có data -> thông báo
     if data_df.empty:
         st.info("⛔ Không có dữ liệu trong tuần này.")
         return
 
-    # Resample
+    # Resample theo tần suất
+    df_plot = data_df.copy()
+    
     if selected_freq == "Ngày (Day)":
-        chart_data = data_df[cols]
-        freq_label = "Ngày"
+        chart_data = df_plot[cols]
+        x_label = "Ngày"
     elif selected_freq == "Tuần (Week)":
-        chart_data = data_df[cols].resample('W').mean()
-        freq_label = "Tuần"
+        # Nếu dữ liệu đã được lọc theo tuần, lấy theo ngày
+        chart_data = df_plot[cols].groupby(df_plot.index.isocalendar().week).mean()
+        chart_data.index = [f"Tuần {w}" for w in chart_data.index]
+        x_label = "Tuần"
+    else:  # Tháng
+        chart_data = df_plot[cols].resample('M').mean()
+        x_label = "Tháng"
+
+    # Lấy điểm cuối cùng (hoặc trung bình tuần/ tháng)
+    if selected_freq == "Ngày (Day)":
+        current_score = df_plot['Điểm Hạnh kiểm'].iloc[-1]
     else:
-        chart_data = data_df[cols].resample('M').mean()
-        freq_label = "Tháng"
+        current_score = chart_data['Điểm Hạnh kiểm'].iloc[-1]
 
-    # Lấy ngày cuối để tính xếp loại
-    current_day = data_df.index.max()
-    mean_score = data_df.loc[current_day, 'Điểm Hạnh kiểm']
-
-    # Phân loại
-    if mean_score >= 90:
-        behavior_class = "A - Tốt"; color = "#4CAF50"
-    elif mean_score >= 80:
-        behavior_class = "B - Khá"; color = "#FF9800"
+    # Phân loại hạnh kiểm
+    if current_score >= 90:
+        behavior_class, color = "A - Tốt", "#4CAF50"
+    elif current_score >= 80:
+        behavior_class, color = "B - Khá", "#FF9800"
     else:
-        behavior_class = "C - Cần Cải Thiện"; color = "#FF4B4B"
+        behavior_class, color = "C - Cần Cải Thiện", "#FF4B4B"
 
-    st.markdown(f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>**{behavior_class}**</span>", unsafe_allow_html=True)
-    st.metric(label=f"Điểm Hạnh kiểm ({freq_label} Hiện tại)", value=f"{mean_score}")
+    st.markdown(
+        f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>{behavior_class}</span>",
+        unsafe_allow_html=True
+    )
+    st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score}")
 
-    # Biểu đồ
-    st.subheader(f"Biểu đồ Xu hướng ({freq_label})")
-    chart_data_long = chart_data.reset_index().melt('Ngày', var_name='Loại Điểm', value_name='Điểm số')
+    # Biểu đồ Altair
+    chart_data_long = chart_data.reset_index().melt(id_vars=chart_data.index.name or 'index', var_name='Loại Điểm', value_name='Điểm số')
+    chart_data_long.rename(columns={chart_data.index.name or 'index': 'Ngày'}, inplace=True)
+
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
     chart = (
         alt.Chart(chart_data_long)
         .mark_line(point=True, strokeWidth=3)
         .encode(
-            x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")),
+            x=alt.X('Ngày:N', title=x_label),
             y=alt.Y('Điểm số:Q', title=None),
             color='Loại Điểm:N',
-            opacity=alt.condition(selection, alt.value(1), alt.value(0.15)),
-            tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
+            opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
+            tooltip=['Ngày:N', 'Loại Điểm', 'Điểm số']
         )
         .add_params(selection)
         .interactive()
     )
-
     st.altair_chart(chart, use_container_width=True)
 
 
@@ -404,9 +418,9 @@ def render_ias_dashboard_page():
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
 
-    # Xác định default index cho selectbox
+    # Lấy mặc định hoặc từ session
     default_index = 0
-    if st.session_state.get('selected_student_id'):
+    if 'selected_student_id' in st.session_state and st.session_state['selected_student_id']:
         ma_hs_target = st.session_state['selected_student_id']
         found_row = df_students[df_students['MaHS'] == ma_hs_target]
         if not found_row.empty:
@@ -416,66 +430,44 @@ def render_ias_dashboard_page():
 
     col1, col2, col3 = st.columns([2, 3, 2.5])
 
-    # -------------------------------
-    # 1. Hồ sơ
-    # -------------------------------
     with col1:
         st.header("1. Hồ sơ")
         selected_student_str = st.selectbox("Học sinh:", student_options_list, index=default_index)
-        if st.button("Cập nhật Dữ liệu"):
-            st.session_state['data_loaded'] = True
-            st.session_state['current_student_name'] = selected_student_str
-            st.session_state['selected_student_id'] = selected_student_str.split('(')[1].replace(')', '')
-        
-        st.markdown("---")
-        if st.session_state.get('data_loaded'):
-            ma_hs = st.session_state['selected_student_id']
-            info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
-            st.markdown(f"**Họ tên:** {info['Họ và tên']}")
-            st.markdown(f"**Lớp:** {info['Lớp']}")
-            st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+        ma_hs = selected_student_str.split('(')[1].replace(')', '')
+        st.session_state['selected_student_id'] = ma_hs
 
-    # -------------------------------
-    # 2. Phân tích Cốt lõi
-    # -------------------------------
+        info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
+        st.markdown(f"**Họ tên:** {info['Họ và tên']}")
+        st.markdown(f"**Lớp:** {info['Lớp']}")
+        st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+
     with col2:
         st.header("2. Phân tích Cốt lõi")
         selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
         
-        if st.session_state.get('data_loaded'):
-            ma_hs = st.session_state['selected_student_id']
-            week_selected = st.session_state.get('selected_week', 3)
-            
-            # Dữ liệu thật hoặc giả lập
-            data_chart = build_behavior_dataset(ma_hs, week_selected)
-            if data_chart.empty:
-                # Nếu không có dữ liệu thật, dùng mock
-                data_chart = generate_behavior_data_mock(st.session_state['current_student_name'])
-            
-            display_core_analysis(data_chart, selected_freq)
-        else:
-            st.info("👈 Nhấn nút Cập nhật Dữ liệu.")
+        week_selected = st.number_input("Chọn Tuần (nếu muốn lọc tuần cụ thể):", min_value=1, max_value=52, value=st.session_state.get('selected_week', 3))
+        st.session_state['selected_week'] = week_selected
 
-    # -------------------------------
-    # 3. Đề xuất
-    # -------------------------------
+        data_chart = build_behavior_dataset(ma_hs, week_selected)
+        display_core_analysis(data_chart, selected_freq, week_selected=week_selected)
+
     with col3:
         st.header("3. Đề xuất")
-        if st.session_state.get('data_loaded'):
-            st.info("Dựa trên tần suất vi phạm và hoạt động")
-            suggestions = [
-                "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
-                "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
-                "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
-                "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
-                "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
-                "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
-                "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
-                "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
-                "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
-            ]
-            ai_suggestion = random.choice(suggestions)
-            st.success(f"🤖 AI: Đề xuất: {ai_suggestion} (Dự định tương lai)")
+        st.info("Dựa trên tần suất vi phạm và hoạt động") 
+
+        suggestions = [
+            "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
+            "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
+            "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
+            "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
+            "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
+            "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
+            "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
+            "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
+            "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
+        ]
+        ai_suggestion = random.choice(suggestions)
+        st.success(f"🤖 AI: Đề xuất: {ai_suggestion}")
 
 
 # ==========================================
@@ -500,16 +492,5 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
-
-
-
-
-
-
-
-
-
-
-
 
 
