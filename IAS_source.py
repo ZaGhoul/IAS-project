@@ -87,7 +87,7 @@ def init_db():
             st.session_state['df_achievements'].to_csv("achievements.csv", index=False)
 
     # 4. Nhật ký Hành vi
-    if 'df_logs' not in st.session_state or True:
+    if 'df_logs' not in st.session_state:
         try:
             st.session_state['df_logs'] = pd.read_csv("logs.csv", parse_dates=['Ngày'])
         except FileNotFoundError:
@@ -557,6 +557,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
