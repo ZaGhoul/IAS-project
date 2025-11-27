@@ -146,23 +146,15 @@ def render_data_management_page():
             # Tính điểm tuần
             logs_week = df_logs[df_logs['Tuần'] == selected_week]
             scores = logs_week.groupby(['MaHS', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
-            if not scores.empty:
-                for col in ['Hoạt động', 'Vi phạm']:
-                    if col not in scores.columns:
-                        scores[col] = 0
-                df_students = df_students.merge(scores, on='MaHS', how='left').fillna(0)
-            else:
-                df_students['Hoạt động'] = 0
-                df_students['Vi phạm'] = 0
-
+            for col in ['Hoạt động', 'Vi phạm']:
+                if col not in scores.columns: scores[col] = 0
+            df_students = df_students.merge(scores, on='MaHS', how='left').fillna(0)
             df_students['Hạnh kiểm'] = 90 + df_students['Hoạt động'] - df_students['Vi phạm']
 
             st.dataframe(
                 df_students, use_container_width=True, hide_index=True,
                 column_config={
-                    "Hạnh kiểm": st.column_config.ProgressColumn(
-                        "Hạnh kiểm", format="%d", min_value=0, max_value=120
-                    )
+                    "Hạnh kiểm": st.column_config.ProgressColumn("Hạnh kiểm", format="%d", min_value=0, max_value=120)
                 }
             )
 
@@ -172,7 +164,7 @@ def render_data_management_page():
         elif table_option == "📝 Nhật ký Hành vi":
             st.subheader(f"📝 Quản lý Nhật ký Hành vi Tuần {selected_week}")
             df_logs = st.session_state['df_logs'].copy()
-        
+
             # --- Thêm nhật ký mới ---
             st.markdown("##### ➕ Thêm Nhật ký Mới")
             df_students = st.session_state['df_students_master']
@@ -186,9 +178,8 @@ def render_data_management_page():
             new_score = st.number_input("Điểm", value=auto_score)
             new_date = st.date_input("Ngày", datetime.date.today())
             new_week = new_date.isocalendar()[1]
-        
+
             if st.button("💾 Lưu vào CSDL"):
-                # Tạo STT
                 next_stt = df_logs['STT'].max() + 1 if not df_logs.empty else 1
                 new_row = {
                     'STT': next_stt,
@@ -201,14 +192,13 @@ def render_data_management_page():
                 }
                 df_logs = pd.concat([df_logs, pd.DataFrame([new_row])], ignore_index=True)
                 st.session_state['df_logs'] = df_logs
-                # Lưu ra CSV để reload không mất
                 df_logs.to_csv("logs.csv", index=False)
                 st.success("Đã thêm mới thành công!")
                 st.experimental_rerun()
-        
+
             # --- Hiển thị bảng nhật ký ---
             logs_week = df_logs[df_logs['Tuần'] == selected_week].copy()
-        
+
             # ---- Fix kiểu dữ liệu cho Streamlit ----
             logs_week['STT'] = logs_week['STT'].astype(int)
             logs_week['MaHS'] = logs_week['MaHS'].astype(str)
@@ -216,11 +206,9 @@ def render_data_management_page():
             logs_week['Nội dung'] = logs_week['Nội dung'].astype(str)
             logs_week['Điểm'] = logs_week['Điểm'].fillna(0).astype(float)
             logs_week['Tuần'] = logs_week['Tuần'].astype(int)
-            # --- fix ValueError nếu dữ liệu trộn string + Timestamp ---
             logs_week['Ngày'] = pd.to_datetime(logs_week['Ngày'], errors='coerce').dt.strftime('%Y-%m-%d')
-        
-            st.dataframe(logs_week, use_container_width=True)
 
+            st.dataframe(logs_week, use_container_width=True)
 
         # ===================
         # C. Danh mục Vi phạm / Hoạt động
@@ -238,7 +226,6 @@ def render_data_management_page():
             if not edited_tc.equals(st.session_state['df_achievements']):
                 st.session_state['df_achievements'] = edited_tc
                 st.experimental_rerun()
-
 
 
 # ==========================================
@@ -477,6 +464,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
