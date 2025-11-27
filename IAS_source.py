@@ -240,12 +240,12 @@ def build_behavior_dataset(ma_hs, week_selected):
     df_logs = df_logs[df_logs['MaHS'] == ma_hs].copy()
     df_logs['Tuần'] = df_logs['Ngày'].dt.isocalendar().week
 
-    # Tạo index 7 ngày trong tuần
+    # Tạo 7 ngày trong tuần
     first_day_of_week = pd.to_datetime(f'2025-W{week_selected}-1', format='%G-W%V-%u')
     week_dates = pd.date_range(first_day_of_week, periods=7, freq='D')
     dataset = pd.DataFrame({'Ngày': week_dates})
 
-    # Mặc định điểm hạnh kiểm 90, vi phạm/hoạt động 0
+    # Tạo cột mặc định
     dataset['Vi phạm'] = 0
     dataset['Hoạt động'] = 0
     dataset['Hạnh kiểm'] = 90
@@ -256,12 +256,13 @@ def build_behavior_dataset(ma_hs, week_selected):
     if not logs_week.empty:
         # Tổng hợp theo ngày và loại
         daily_scores = logs_week.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
+        # Đảm bảo luôn có 2 cột
         for col in ['Vi phạm', 'Hoạt động']:
             if col not in daily_scores.columns:
                 daily_scores[col] = 0
 
-        # Gán vào dataset chuẩn 7 ngày
-        dataset = dataset.merge(daily_scores, left_on='Ngày', right_index=True, how='left')
+        # Merge và fillna
+        dataset = dataset.merge(daily_scores[['Vi phạm', 'Hoạt động']], left_on='Ngày', right_index=True, how='left')
         dataset['Vi phạm'] = dataset['Vi phạm'].fillna(0)
         dataset['Hoạt động'] = dataset['Hoạt động'].fillna(0)
         dataset['Hạnh kiểm'] = 90 + dataset['Hoạt động'] - dataset['Vi phạm']
@@ -450,6 +451,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
