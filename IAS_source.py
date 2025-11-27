@@ -241,13 +241,24 @@ def build_behavior_dataset(ma_hs, week_selected):
     df_logs = df_logs[df_logs['MaHS'] == ma_hs].copy()
     
     # Tính toán lại Tuần (để đảm bảo không có lỗi)
-    df_logs['Tuần'] = df_logs['Ngày'].dt.isocalendar().week.astype(int) 
+    # Cần đảm bảo df_logs không rỗng trước khi truy cập .dt.isocalendar()
+    if not df_logs.empty:
+         df_logs['Tuần'] = df_logs['Ngày'].dt.isocalendar().week.astype(int) 
+    else:
+        # Xử lý trường hợp không có log
+        pass
+
 
     # 1. Tạo 7 ngày trong tuần
     # Tìm ngày đầu tiên của tuần (Giả sử năm 2025)
     first_day_of_week = pd.to_datetime(f'2025-W{week_selected}-1', format='%G-W%V-%u')
     week_dates = pd.date_range(first_day_of_week, periods=7, freq='D')
     dataset = pd.DataFrame({'Ngày': week_dates})
+    
+    # Khởi tạo điểm mặc định
+    dataset['Vi phạm'] = 0.0
+    dataset['Hoạt động'] = 0.0
+    dataset['Hạnh kiểm'] = 90.0
 
     # 2. Tổng hợp điểm từ Nhật ký Hành vi
     logs_week = df_logs[df_logs['Tuần'] == week_selected]
@@ -263,27 +274,21 @@ def build_behavior_dataset(ma_hs, week_selected):
 
         daily_scores = daily_scores.reset_index()
 
-        # 3. Merge vào dataset. Dữ liệu scores sẽ được thêm với hậu tố _y
-        # Cột Hoạt động, Vi phạm trong dataset ban đầu không cần thiết vì sẽ bị ghi đè.
-        dataset = dataset.merge(daily_scores[['Ngày','Vi phạm','Hoạt động']], on='Ngày', how='left')
-
-        # === FIX LỖI KEYERROR TẠI ĐÂY ===
-        # Thay vì dùng cột 'Vi phạm' (đã bị đổi tên thành 'Vi phạm_x' do merge),
-        # ta dùng cột 'Vi phạm_y' và 'Hoạt động_y' (là dữ liệu điểm mới nhất)
-        dataset['Vi phạm'] = dataset['Vi phạm_y'].fillna(0)
-        dataset['Hoạt động'] = dataset['Hoạt động_y'].fillna(0)
+        dataset = dataset.merge(daily_scores[['Ngày','Vi phạm','Hoạt động']], on='Ngày', how='left', suffixes=('_base', '_new'))
         
-        # 4. Tính hạnh kiểm và dọn dẹp
+        # 4. Gán và Tính hạnh kiểm
+        # Sử dụng dữ liệu mới (_new) và điền 0 nếu không có log (là NaN sau merge)
+        dataset['Vi phạm'] = dataset['Vi phạm_new'].fillna(0)
+        dataset['Hoạt động'] = dataset['Hoạt động_new'].fillna(0)
         dataset['Hạnh kiểm'] = 90 + dataset['Hoạt động'] - dataset['Vi phạm']
         
         # Xóa các cột tạm thời do merge sinh ra
-        dataset = dataset.drop(columns=['Vi phạm_y', 'Hoạt động_y'])
+        dataset = dataset.drop(columns=['Vi phạm_base', 'Hoạt động_base', 'Vi phạm_new', 'Hoạt động_new'])
         
-    else:
-        # Nếu không có log trong tuần, tạo giá trị mặc định (90 điểm Hạnh kiểm)
-        dataset['Vi phạm'] = 0
-        dataset['Hoạt động'] = 0
-        dataset['Hạnh kiểm'] = 90
+    # Trường hợp else (Không có log) đã được xử lý bằng cách khởi tạo mặc định.
+
+    # 5. Đảm bảo cột Ngày là index
+    dataset = dataset.set_index('Ngày')
 
     return dataset
 
@@ -470,6 +475,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
