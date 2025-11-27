@@ -338,7 +338,7 @@ def display_core_analysis(data_df, selected_freq):
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
         y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
         color=alt.Color('Loại Điểm:N', scale=alt.Scale(domain=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'], range=['#FF4B4B', '#2E8B57', '#1E90FF']), legend=alt.Legend(title="Chú thích", orient="bottom")),
-        opacity=alt.condition(selection | alt.datum.Loại_Điểm == None, alt.value(1), alt.value(0.05)), tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
+        opacity=alt.condition(selection, alt.value(1), alt.value(0.05)), tooltip=['Ngày:T', 'Loại Điểm', 'Điểm số']
     ).add_params(selection).interactive()
     st.altair_chart(chart, use_container_width=True)
 
@@ -401,6 +401,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
