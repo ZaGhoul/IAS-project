@@ -475,10 +475,13 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
     
     # Mã hóa trục X
     if x_type == 'T':
+        # FIX: Thêm ":T" vào đây. 
+        # Cột 'Ngày' khi là 'Ngày (Day)' là DatetimeIndex, cần khai báo là 'T' (Temporal)
         x_encoding = alt.X('Ngày:T', title=x_label) 
     else:
+        # Khi là Tuần/Tháng, 'Ngày' là chuỗi (Nominal), giữ nguyên là 'N'
         x_encoding = alt.X('Ngày:N', title=x_label, sort=None) 
-        chart_data_long['Ngày'] = chart_data_long['Ngày'].astype(str) 
+        chart_data_long['Ngày'] = chart_data_long['Ngày'].astype(str)
 
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
     
@@ -568,6 +571,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
