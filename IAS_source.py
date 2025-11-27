@@ -399,59 +399,84 @@ def display_core_analysis(data_df, selected_freq):
 
 
 def render_ias_dashboard_page():
-    week_selected = st.session_state.get('selected_week', 3)
-    data_chart = build_behavior_dataset(ma_hs, week_selected)
-    display_core_analysis(data_chart, selected_freq)
-    
     st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
+
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
+
+    # Xác định default index cho selectbox
     default_index = 0
-    if st.session_state['selected_student_id']:
+    if st.session_state.get('selected_student_id'):
         ma_hs_target = st.session_state['selected_student_id']
         found_row = df_students[df_students['MaHS'] == ma_hs_target]
         if not found_row.empty:
             target_string = f"{found_row.iloc[0]['Họ và tên']} ({found_row.iloc[0]['MaHS']})"
-            if target_string in student_options_list: default_index = student_options_list.index(target_string)
-    
+            if target_string in student_options_list:
+                default_index = student_options_list.index(target_string)
+
     col1, col2, col3 = st.columns([2, 3, 2.5])
+
+    # -------------------------------
+    # 1. Hồ sơ
+    # -------------------------------
     with col1:
         st.header("1. Hồ sơ")
         selected_student_str = st.selectbox("Học sinh:", student_options_list, index=default_index)
-        st.session_state['selected_student_id'] = None 
-        if st.button("Cập nhật Dữ liệu"): st.session_state['data_loaded'] = True; st.session_state['current_student_name'] = selected_student_str
+        if st.button("Cập nhật Dữ liệu"):
+            st.session_state['data_loaded'] = True
+            st.session_state['current_student_name'] = selected_student_str
+            st.session_state['selected_student_id'] = selected_student_str.split('(')[1].replace(')', '')
+        
         st.markdown("---")
-        if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
-            ma_hs = selected_student_str.split('(')[1].replace(')', '')
+        if st.session_state.get('data_loaded'):
+            ma_hs = st.session_state['selected_student_id']
             info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
-            st.markdown(f"**Họ tên:** {info['Họ và tên']}"); st.markdown(f"**Lớp:** {info['Lớp']}"); st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+            st.markdown(f"**Họ tên:** {info['Họ và tên']}")
+            st.markdown(f"**Lớp:** {info['Lớp']}")
+            st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+
+    # -------------------------------
+    # 2. Phân tích Cốt lõi
+    # -------------------------------
     with col2:
         st.header("2. Phân tích Cốt lõi")
         selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
-        if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
-            with st.container(height=550, border=False):
+        
+        if st.session_state.get('data_loaded'):
+            ma_hs = st.session_state['selected_student_id']
+            week_selected = st.session_state.get('selected_week', 3)
+            
+            # Dữ liệu thật hoặc giả lập
+            data_chart = build_behavior_dataset(ma_hs, week_selected)
+            if data_chart.empty:
+                # Nếu không có dữ liệu thật, dùng mock
                 data_chart = generate_behavior_data_mock(st.session_state['current_student_name'])
-                display_core_analysis(data_chart, selected_freq)
-        else: st.info("👈 Nhấn nút Cập nhật Dữ liệu.")
+            
+            display_core_analysis(data_chart, selected_freq)
+        else:
+            st.info("👈 Nhấn nút Cập nhật Dữ liệu.")
+
+    # -------------------------------
+    # 3. Đề xuất
+    # -------------------------------
     with col3:
         st.header("3. Đề xuất")
-        if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
-            with st.container(height=550, border=False):
-                st.info("Dựa trên tần suất vi phạm và hoạt động"); 
-                st.success("🤖 AI: Học sinh đang có xu hướng Hoạt động. (Dự định tương lai)")
-                suggestions = [
-                    "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
-                    "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
-                    "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
-                    "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
-                    "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
-                    "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
-                    "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
-                    "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
-                    "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
-                ]
-                ai_suggestion = random.choice(suggestions)
-                st.success(f"🤖 AI: Đề xuất: {ai_suggestion} (Dự định tương lai)")
+        if st.session_state.get('data_loaded'):
+            st.info("Dựa trên tần suất vi phạm và hoạt động")
+            suggestions = [
+                "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
+                "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
+                "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
+                "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
+                "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
+                "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
+                "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
+                "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
+                "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
+            ]
+            ai_suggestion = random.choice(suggestions)
+            st.success(f"🤖 AI: Đề xuất: {ai_suggestion} (Dự định tương lai)")
+
 
 # ==========================================
 # 5. ĐIỀU HƯỚNG CHÍNH
@@ -475,6 +500,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
