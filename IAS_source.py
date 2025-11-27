@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import random
+import os
 import altair as alt
 
 # ==========================================
@@ -44,45 +45,65 @@ div[data-testid="stExpander"] {
 # 2. KHỞI TẠO CƠ SỞ DỮ LIỆU
 # ==========================================
 
+import os
+
 def init_db():
     # 1. Bảng Học sinh (Master)
     if 'df_students_master' not in st.session_state:
-        data_hs = {
-            'MaHS': ['HS001', 'HS002', 'HS003', 'HS004', 'HS005'],
-            'Họ và tên': ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Phạm Thị D', 'Hoàng Văn E'],
-            'Ngày sinh': ['2008-01-15', '2008-05-20', '2008-11-02', '2008-03-10', '2008-08-18'],
-            'Lớp': ['11A1', '11A1', '11A2', '11A2', '11A3']
-        }
-        st.session_state['df_students_master'] = pd.DataFrame(data_hs)
+        try:
+            st.session_state['df_students_master'] = pd.read_csv("students_master.csv")
+        except FileNotFoundError:
+            data_hs = {
+                'MaHS': ['HS001', 'HS002', 'HS003', 'HS004', 'HS005'],
+                'Họ và tên': ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Phạm Thị D', 'Hoàng Văn E'],
+                'Ngày sinh': ['2008-01-15', '2008-05-20', '2008-11-02', '2008-03-10', '2008-08-18'],
+                'Lớp': ['11A1', '11A1', '11A2', '11A2', '11A3']
+            }
+            st.session_state['df_students_master'] = pd.DataFrame(data_hs)
+            st.session_state['df_students_master'].to_csv("students_master.csv", index=False)
 
-    # 2. Bảng Danh mục Vi Phạm
+    # 2. Danh mục Vi phạm
     if 'df_violations' not in st.session_state:
-        data_vp = {
-            'Tên Vi phạm': ['Đi học muộn', 'Không làm bài tập', 'Mất trật tự', 'Không trực nhật', 'Quên vở'],
-            'Điểm': [2, 5, 3, 5, 2]
-        }
-        st.session_state['df_violations'] = pd.DataFrame(data_vp)
+        try:
+            st.session_state['df_violations'] = pd.read_csv("violations.csv")
+        except FileNotFoundError:
+            data_vp = {
+                'Tên Vi phạm': ['Đi học muộn', 'Không làm bài tập', 'Mất trật tự', 'Không trực nhật', 'Quên vở'],
+                'Điểm': [2, 5, 3, 5, 2]
+            }
+            st.session_state['df_violations'] = pd.DataFrame(data_vp)
+            st.session_state['df_violations'].to_csv("violations.csv", index=False)
 
-    # 3. Bảng Danh mục Hoạt động
+    # 3. Danh mục Hoạt động
     if 'df_achievements' not in st.session_state:
-        data_tc = {
-            'Tên Hoạt động': ['Phát biểu bài', 'Đạt điểm 10', 'Giúp đỡ bạn bè', 'Tham gia CLB', 'Làm việc nhóm tốt'],
-            'Điểm': [2, 5, 3, 5, 5]
-        }
-        st.session_state['df_achievements'] = pd.DataFrame(data_tc)
+        try:
+            st.session_state['df_achievements'] = pd.read_csv("achievements.csv")
+        except FileNotFoundError:
+            data_tc = {
+                'Tên Hoạt động': ['Phát biểu bài', 'Đạt điểm 10', 'Giúp đỡ bạn bè', 'Tham gia CLB', 'Làm việc nhóm tốt'],
+                'Điểm': [2, 5, 3, 5, 5]
+            }
+            st.session_state['df_achievements'] = pd.DataFrame(data_tc)
+            st.session_state['df_achievements'].to_csv("achievements.csv", index=False)
 
-    # 4. Bảng Nhật ký Hành vi
+    # 4. Nhật ký Hành vi
     if 'df_logs' not in st.session_state:
-        # Khởi tạo rỗng hoặc có mẫu, có cột STT
-        logs_data = [
-            {'STT': 1, 'Ngày': datetime.date(2025, 1, 2), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Phát biểu bài', 'Điểm': 5, 'Tuần': 1},
-            {'STT': 2, 'Ngày': datetime.date(2025, 1, 3), 'MaHS': 'HS002', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 1},
-            {'STT': 3, 'Ngày': datetime.date(2025, 1, 16), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Quên vở', 'Điểm': 2, 'Tuần': 3}
-        ]
-        st.session_state['df_logs'] = pd.DataFrame(logs_data)
+        try:
+            st.session_state['df_logs'] = pd.read_csv("logs.csv", parse_dates=['Ngày'])
+        except FileNotFoundError:
+            logs_data = [
+                {'STT': 1, 'Ngày': pd.to_datetime('2025-01-02'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Phát biểu bài', 'Điểm': 5, 'Tuần': 1},
+                {'STT': 2, 'Ngày': pd.to_datetime('2025-01-03'), 'MaHS': 'HS002', 'Loại': 'Vi phạm', 'Nội dung': 'Đi học muộn', 'Điểm': 2, 'Tuần': 1},
+                {'STT': 3, 'Ngày': pd.to_datetime('2025-01-16'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Quên vở', 'Điểm': 2, 'Tuần': 3}
+            ]
+            st.session_state['df_logs'] = pd.DataFrame(logs_data)
+            st.session_state['df_logs'].to_csv("logs.csv", index=False)
 
-    if 'current_page' not in st.session_state: st.session_state['current_page'] = 'dashboard'
-    if 'selected_student_id' not in st.session_state: st.session_state['selected_student_id'] = None
+    if 'current_page' not in st.session_state:
+        st.session_state['current_page'] = 'dashboard'
+    if 'selected_student_id' not in st.session_state:
+        st.session_state['selected_student_id'] = None
+        
 
 init_db()
 
@@ -345,11 +366,6 @@ def generate_behavior_data_mock(student_name):
     return df
 
 def display_core_analysis(data_df, selected_freq, week_selected=None):
-    """
-    Hiển thị biểu đồ điểm Vi phạm / Hoạt động / Hạnh kiểm.
-    Hỗ trợ Ngày / Tuần / Tháng.
-    Khi chọn tuần, hiển thị đủ 7 ngày trong tuần đó.
-    """
     cols = ['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']
 
     if data_df.empty:
@@ -358,27 +374,30 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
 
     df_plot = data_df.copy()
 
-    # Nếu chọn tuần cụ thể → lọc 7 ngày trong tuần đó
+    # Lọc theo tuần cụ thể nếu cần
     if week_selected:
         df_plot = df_plot[df_plot.index.isocalendar().week == week_selected]
 
+    df_plot = df_plot.sort_index()
+
+    # Chuyển index thành string để Altair hiển thị chuẩn
+    df_plot_for_chart = df_plot.copy()
+    df_plot_for_chart.index = df_plot_for_chart.index.strftime('%d/%m')
+
     if selected_freq == "Ngày (Day)" or (selected_freq == "Tuần (Week)" and week_selected):
-        # Hiển thị theo từng ngày
-        chart_data = df_plot[cols]
+        chart_data = df_plot_for_chart[cols]
         x_label = "Ngày"
     elif selected_freq == "Tuần (Week)":
-        # Trung bình tuần (nhiều tuần)
         chart_data = df_plot[cols].groupby(df_plot.index.isocalendar().week).mean()
         chart_data.index = [f"Tuần {w}" for w in chart_data.index]
         x_label = "Tuần"
     else:  # Tháng
-        chart_data = df_plot[cols].resample('M').mean()
+        chart_data = df_plot.resample('M').mean()
+        chart_data.index = chart_data.index.strftime('%m/%Y')
         x_label = "Tháng"
 
-    # Điểm cuối cùng dùng để xếp loại
     current_score = chart_data['Điểm Hạnh kiểm'].iloc[-1]
 
-    # Phân loại hạnh kiểm
     if current_score >= 90:
         behavior_class, color = "A - Tốt", "#4CAF50"
     elif current_score >= 80:
@@ -392,9 +411,9 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
     )
     st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score}")
 
-    # Biểu đồ Altair
-    chart_data_long = chart_data.reset_index().melt(chart_data.index.name or 'index', var_name='Loại Điểm', value_name='Điểm số')
-    chart_data_long.rename(columns={chart_data.index.name or 'index': 'Ngày'}, inplace=True)
+    # Biểu đồ
+    chart_data_long = chart_data.reset_index().melt(chart_data.index.name or 'Ngày', var_name='Loại Điểm', value_name='Điểm số')
+    chart_data_long.rename(columns={chart_data.index.name or 'Ngày': 'Ngày'}, inplace=True)
 
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
     chart = (
@@ -415,60 +434,50 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
 
 def render_ias_dashboard_page():
     st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
-
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
-
-    # Lấy mặc định hoặc từ session
     default_index = 0
-    if 'selected_student_id' in st.session_state and st.session_state['selected_student_id']:
+    if st.session_state['selected_student_id']:
         ma_hs_target = st.session_state['selected_student_id']
         found_row = df_students[df_students['MaHS'] == ma_hs_target]
         if not found_row.empty:
             target_string = f"{found_row.iloc[0]['Họ và tên']} ({found_row.iloc[0]['MaHS']})"
-            if target_string in student_options_list:
-                default_index = student_options_list.index(target_string)
+            if target_string in student_options_list: default_index = student_options_list.index(target_string)
 
-    col1, col2, col3 = st.columns([2, 3, 2.5])
-
+    col1, col2, col3 = st.columns([2,3,2.5])
     with col1:
         st.header("1. Hồ sơ")
         selected_student_str = st.selectbox("Học sinh:", student_options_list, index=default_index)
         ma_hs = selected_student_str.split('(')[1].replace(')', '')
         st.session_state['selected_student_id'] = ma_hs
 
+        week_selected = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3)
+
         info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
-        st.markdown(f"**Họ tên:** {info['Họ và tên']}")
-        st.markdown(f"**Lớp:** {info['Lớp']}")
-        st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+        st.markdown(f"**Họ tên:** {info['Họ và tên']}"); st.markdown(f"**Lớp:** {info['Lớp']}"); st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
 
     with col2:
         st.header("2. Phân tích Cốt lõi")
         selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
-        
-        week_selected = st.number_input("Chọn Tuần (nếu muốn lọc tuần cụ thể):", min_value=1, max_value=52, value=st.session_state.get('selected_week', 3))
-        st.session_state['selected_week'] = week_selected
-
         data_chart = build_behavior_dataset(ma_hs, week_selected)
         display_core_analysis(data_chart, selected_freq, week_selected=week_selected)
 
     with col3:
         st.header("3. Đề xuất")
-        st.info("Dựa trên tần suất vi phạm và hoạt động") 
-
-        suggestions = [
-            "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
-            "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
-            "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
-            "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
-            "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
-            "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
-            "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
-            "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
-            "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
-        ]
-        ai_suggestion = random.choice(suggestions)
-        st.success(f"🤖 AI: Đề xuất: {ai_suggestion}")
+        if not data_chart.empty:
+            suggestions = [
+                "Học sinh đang có xu hướng hoạt động tốt, nên tăng cường giao nhiệm vụ nhóm.",
+                "Nên khuyến khích học sinh tham gia các hoạt động ngoại khóa để phát triển kỹ năng mềm.",
+                "Học sinh có dấu hiệu giảm vi phạm, cần tiếp tục duy trì nề nếp hiện tại.",
+                "Khuyến nghị giáo viên trao đổi thêm để hỗ trợ học sinh phát huy điểm mạnh.",
+                "Học sinh đang có tiến bộ tích cực, nên khen thưởng nhỏ để thúc đẩy thêm động lực.",
+                "Nên khuyến khích học sinh tham gia CLB hoặc đội nhóm để giao tiếp nhiều hơn.",
+                "Học sinh có chỉ số hành vi ổn định, đề xuất tăng cường các hoạt động trải nghiệm.",
+                "Dấu hiệu cho thấy học sinh có thể đảm nhận một vai trò trong nhóm học tập.",
+                "Học sinh nên cân bằng giữa học tập và sinh hoạt để duy trì phong độ."
+            ]
+            ai_suggestion = random.choice(suggestions)
+            st.success(f"🤖 AI: Đề xuất: {ai_suggestion} (Dự kiến tương lai)")
 
 
 # ==========================================
@@ -493,6 +502,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
