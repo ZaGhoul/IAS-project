@@ -256,18 +256,25 @@ def build_behavior_dataset(ma_hs, week_selected):
     if not logs_week.empty:
         # Tổng hợp theo ngày và loại
         daily_scores = logs_week.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
-        # Đảm bảo luôn có 2 cột
+
+        # Đảm bảo có 2 cột Vi phạm và Hoạt động
         for col in ['Vi phạm', 'Hoạt động']:
             if col not in daily_scores.columns:
                 daily_scores[col] = 0
 
-        # Merge và fillna
-        dataset = dataset.merge(daily_scores[['Vi phạm', 'Hoạt động']], left_on='Ngày', right_index=True, how='left')
+        # Reset index để merge theo cột 'Ngày'
+        daily_scores = daily_scores.reset_index()
+
+        # Merge vào dataset
+        dataset = dataset.merge(daily_scores[['Ngày','Vi phạm','Hoạt động']], on='Ngày', how='left')
+
+        # Fill na và tính hạnh kiểm
         dataset['Vi phạm'] = dataset['Vi phạm'].fillna(0)
         dataset['Hoạt động'] = dataset['Hoạt động'].fillna(0)
         dataset['Hạnh kiểm'] = 90 + dataset['Hoạt động'] - dataset['Vi phạm']
 
     return dataset
+
 
 def calculate_score(df):
     score = df['Điểm Hạnh kiểm'].mean().round(1)
@@ -451,6 +458,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
