@@ -333,7 +333,7 @@ def display_core_analysis(data_df, selected_freq):
     
     st.subheader(f"Biểu đồ Xu hướng ({freq_label})")
     chart_data_long = chart_data.reset_index().melt('Ngày', var_name='Loại Điểm', value_name='Điểm số')
-    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend', empty=true)
+    selection = alt.selection_point(fields=['Loại Điểm'], bind='legend', empty=True)
     chart = alt.Chart(chart_data_long).mark_line(point=True, strokeWidth=3).encode(
         x=alt.X('Ngày:T', title=None, axis=alt.Axis(format="%d/%m")), 
         y=alt.Y('Điểm số:Q', title=None, scale=alt.Scale(zero=False)),
@@ -401,6 +401,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
