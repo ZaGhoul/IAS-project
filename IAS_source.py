@@ -467,21 +467,19 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
     # 3. Biểu đồ Altair
     # Luôn reset index để cột Ngày/Tuần/Tháng xuất hiện với tên là 'Ngày'
     chart_data_long = chart_data.reset_index().melt(
-        # FIX: Dùng tên cột index mới là 'Ngày'
         'Ngày', 
         var_name='Loại Điểm', 
         value_name='Điểm số'
     )
     
     # Mã hóa trục X
-    if x_type == 'T':
-        # FIX: Thêm ":T" vào đây. 
-        # Cột 'Ngày' khi là 'Ngày (Day)' là DatetimeIndex, cần khai báo là 'T' (Temporal)
-        x_encoding = alt.X('Ngày:T', title=x_label) 
-    else:
-        # Khi là Tuần/Tháng, 'Ngày' là chuỗi (Nominal), giữ nguyên là 'N'
+    if x_type == 'T': # Khi là Ngày (Temporal)
+        # Giữ nguyên kiểu datetime64 của cột 'Ngày'
+        x_encoding = alt.X('Ngày:T', title=x_label, axis=alt.Axis(format="%a %d")) # Thêm format cho dễ nhìn
+    else:  # Khi là Tuần hoặc Tháng (Nominal)
+        # Phải ép kiểu thành chuỗi TẠI ĐÂY để Altair không cố gắng dịch sang timestamp
+        chart_data_long['Ngày'] = chart_data_long['Ngày'].astype(str) 
         x_encoding = alt.X('Ngày:N', title=x_label, sort=None) 
-        chart_data_long['Ngày'] = chart_data_long['Ngày'].astype(str)
 
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
     
@@ -489,7 +487,8 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
         alt.Chart(chart_data_long)
         .mark_line(point=True, strokeWidth=3)
         .encode(
-            x=x_encoding,
+            # Sử dụng x_encoding đã định nghĩa ở trên
+            x=x_encoding, 
             y=alt.Y('Điểm số:Q', title=None),
             color='Loại Điểm:N',
             opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
@@ -571,6 +570,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
