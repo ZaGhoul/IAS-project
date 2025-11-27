@@ -45,8 +45,6 @@ div[data-testid="stExpander"] {
 # 2. KHỞI TẠO CƠ SỞ DỮ LIỆU
 # ==========================================
 
-import os
-
 def init_db():
     # 1. Bảng Học sinh (Master)
     if 'df_students_master' not in st.session_state:
@@ -231,52 +229,44 @@ def render_data_management_page():
 # ==========================================
 # 4. LOGIC TRANG 2: DASHBOARD IAS
 # ==========================================
-def build_behavior_dataset(ma_hs, week_selected=None):
-    logs_df = st.session_state['df_logs'].copy()
-    logs_df = logs_df[logs_df['MaHS'] == ma_hs]
+def build_behavior_dataset(ma_hs, week_selected):
+    """
+    Trả về DataFrame gồm 7 ngày trong tuần week_selected
+    với các cột: 'Ngày', 'Vi phạm', 'Hoạt động', 'Hạnh kiểm'
+    """
+    df_logs = st.session_state['df_logs'].copy()
+    df_logs['Ngày'] = pd.to_datetime(df_logs['Ngày'], errors='coerce')
+    df_logs = df_logs.dropna(subset=['Ngày'])
+    df_logs = df_logs[df_logs['MaHS'] == ma_hs].copy()
+    df_logs['Tuần'] = df_logs['Ngày'].dt.isocalendar().week
 
-    if logs_df.empty:
-        # Không có nhật ký, tạo DataFrame trống với index theo tuần nếu cần
-        start_date = pd.Timestamp('2025-01-01')
-        end_date = pd.Timestamp('2025-12-31')
-        date_index = pd.date_range(start_date, end_date)
-        df = pd.DataFrame(index=date_index, columns=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'])
-        df.fillna(0, inplace=True)
-        df['Điểm Hạnh kiểm'] = 90
-        return df
+    # Tạo index 7 ngày trong tuần
+    first_day_of_week = pd.to_datetime(f'2025-W{week_selected}-1', format='%G-W%V-%u')
+    week_dates = pd.date_range(first_day_of_week, periods=7, freq='D')
+    dataset = pd.DataFrame({'Ngày': week_dates})
 
-    # Đặt cột Ngày làm index
-    logs_df['Ngày'] = pd.to_datetime(logs_df['Ngày'])
-    logs_df.set_index('Ngày', inplace=True)
-    logs_df.sort_index(inplace=True)
+    # Mặc định điểm hạnh kiểm 90, vi phạm/hoạt động 0
+    dataset['Vi phạm'] = 0
+    dataset['Hoạt động'] = 0
+    dataset['Hạnh kiểm'] = 90
 
-    # Lấy dải ngày cần vẽ
-    if week_selected:
-        week_dates = pd.date_range(
-            start=logs_df.index.min().normalize(),
-            end=logs_df.index.max().normalize()
-        )
-        # Chỉ lấy tuần được chọn
-        week_dates = [d for d in week_dates if d.isocalendar().week == week_selected]
-        if not week_dates:
-            week_dates = pd.date_range(start=logs_df.index.min(), end=logs_df.index.max())
-    else:
-        week_dates = pd.date_range(start=logs_df.index.min(), end=logs_df.index.max())
+    # Lọc nhật ký trong tuần
+    logs_week = df_logs[df_logs['Tuần'] == week_selected]
 
-    df = pd.DataFrame(index=week_dates, columns=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'])
-    df.fillna(0, inplace=True)
-    df['Điểm Hạnh kiểm'] = 90  # mặc định 90
+    if not logs_week.empty:
+        # Tổng hợp theo ngày và loại
+        daily_scores = logs_week.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
+        for col in ['Vi phạm', 'Hoạt động']:
+            if col not in daily_scores.columns:
+                daily_scores[col] = 0
 
-    for d in week_dates:
-        day_logs = logs_df[logs_df.index == d]
-        if not day_logs.empty:
-            vi_pham = day_logs[day_logs['Loại'] == 'Vi phạm']['Điểm'].sum()
-            hoat_dong = day_logs[day_logs['Loại'] == 'Hoạt động']['Điểm'].sum()
-            df.at[d, 'Điểm Vi phạm'] = vi_pham
-            df.at[d, 'Điểm Hoạt động'] = hoat_dong
-            df.at[d, 'Điểm Hạnh kiểm'] = 90 - vi_pham + hoat_dong
+        # Gán vào dataset chuẩn 7 ngày
+        dataset = dataset.merge(daily_scores, left_on='Ngày', right_index=True, how='left')
+        dataset['Vi phạm'] = dataset['Vi phạm'].fillna(0)
+        dataset['Hoạt động'] = dataset['Hoạt động'].fillna(0)
+        dataset['Hạnh kiểm'] = 90 + dataset['Hoạt động'] - dataset['Vi phạm']
 
-    return df
+    return dataset
 
 def calculate_score(df):
     score = df['Điểm Hạnh kiểm'].mean().round(1)
@@ -385,12 +375,9 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
 
 def render_ias_dashboard_page():
     st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
-    
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
     default_index = 0
-
-    # --- Lấy học sinh đã chọn trước đó ---
     if st.session_state.get('selected_student_id'):
         ma_hs_target = st.session_state['selected_student_id']
         found_row = df_students[df_students['MaHS'] == ma_hs_target]
@@ -400,8 +387,6 @@ def render_ias_dashboard_page():
                 default_index = student_options_list.index(target_string)
 
     col1, col2, col3 = st.columns([2,3,2.5])
-
-    # --- Cột 1: Hồ sơ ---
     with col1:
         st.header("1. Hồ sơ")
         selected_student_str = st.selectbox("Học sinh:", student_options_list, index=default_index)
@@ -411,19 +396,19 @@ def render_ias_dashboard_page():
         week_selected = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3)
 
         info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
-        st.markdown(f"**Họ tên:** {info['Họ và tên']}")
-        st.markdown(f"**Lớp:** {info['Lớp']}")
-        st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+        st.markdown(f"**Họ tên:** {info['Họ và tên']}"); st.markdown(f"**Lớp:** {info['Lớp']}"); st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
 
-    # --- Cột 2: Phân tích cốt lõi ---
     with col2:
         st.header("2. Phân tích Cốt lõi")
         selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
-        # Lấy dữ liệu build_behavior_dataset mới
         data_chart = build_behavior_dataset(ma_hs, week_selected)
-        display_core_analysis(data_chart, selected_freq, week_selected=week_selected)
 
-    # --- Cột 3: Đề xuất ---
+        # --- Biểu đồ trend line ---
+        chart_data_long = data_chart.melt(id_vars='Ngày', value_vars=['Vi phạm','Hoạt động','Hạnh kiểm'],
+                                          var_name='Loại Điểm', value_name='Điểm số')
+        chart_data_long['Ngày'] = pd.to_datetime(chart_data_long['Ngày'])
+        st.line_chart(data=chart_data_long.pivot(index='Ngày', columns='Loại Điểm', values='Điểm số'))
+
     with col3:
         st.header("3. Đề xuất")
         if not data_chart.empty:
@@ -440,6 +425,7 @@ def render_ias_dashboard_page():
             ]
             ai_suggestion = random.choice(suggestions)
             st.success(f"🤖 AI: Đề xuất: {ai_suggestion} (Dự kiến tương lai)")
+
 
 
 # ==========================================
@@ -464,6 +450,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
