@@ -103,8 +103,8 @@ def init_db():
             {'STT': 9, 'Ngày': pd.to_datetime('2025-01-18'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Tham gia CLB', 'Điểm': 5, 'Tuần': 3},
             {'STT': 10, 'Ngày': pd.to_datetime('2025-01-14'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không làm bài tập', 'Điểm': 5, 'Tuần': 3},
             {'STT': 11, 'Ngày': pd.to_datetime('2025-01-15'), 'MaHS': 'HS001', 'Loại': 'Hoạt động', 'Nội dung': 'Tham gia CLB', 'Điểm': 5, 'Tuần': 3},
-            {'STT': 12, 'Ngày': pd.to_datetime('2025-01-15'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không làm bài tập', 'Điểm': 5, 'Tuần': 3},
-            {'STT': 12, 'Ngày': pd.to_datetime('2025-01-15'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không trực nhật', 'Điểm': 5, 'Tuần': 3}
+            {'STT': 12, 'Ngày': pd.to_datetime('2025-01-19'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không làm bài tập', 'Điểm': 5, 'Tuần': 3},
+            {'STT': 12, 'Ngày': pd.to_datetime('2025-01-19'), 'MaHS': 'HS001', 'Loại': 'Vi phạm', 'Nội dung': 'Không trực nhật', 'Điểm': 5, 'Tuần': 3}
         ]
     
         # 2. Tạo DataFrame từ dữ liệu mẫu
@@ -568,6 +568,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
