@@ -311,36 +311,73 @@ def render_data_management_page():
 # ==========================================
 # 4. LOGIC TRANG 2: DASHBOARD IAS
 # ==========================================
-def build_behavior_dataset(ma_hs, week_selected=None):
-    df_logs = st.session_state['df_logs']
+def build_behavior_dataset(ma_hs, week_selected):
+    df_logs = st.session_state['df_logs'].copy()
+    
+    # Đảm bảo cột Ngày là kiểu datetime
+    df_logs['Ngày'] = pd.to_datetime(df_logs['Ngày'], errors='coerce') 
+    df_logs = df_logs.dropna(subset=['Ngày'])
+    df_logs = df_logs[df_logs['MaHS'] == ma_hs].copy()
+    
+    # 1. Tạo 7 ngày trong tuần được chọn (week_selected)
+    try:
+        # Tìm ngày đầu tiên của tuần (Giả sử năm 2025)
+        # Sử dụng ISO Week Number: %G-W%V-%u (năm-tuần-ngày)
+        first_day_of_week = pd.to_datetime(f'2025-W{week_selected}-1', format='%G-W%V-%u')
+    except ValueError:
+        # Xử lý nếu tuần không hợp lệ (nên không xảy ra với min_value=1)
+        return pd.DataFrame() 
 
-    # Chỉ lấy dữ liệu học sinh này
-    df = df_logs[df_logs['MaHS'] == ma_hs].copy()
+    week_dates = pd.date_range(first_day_of_week, periods=7, freq='D')
+    
+    # Khởi tạo dataset 7 ngày
+    dataset = pd.DataFrame({'Ngày': week_dates})
+    dataset['Điểm Vi phạm'] = 0.0
+    dataset['Điểm Hoạt động'] = 0.0
+    dataset['Điểm Hạnh kiểm'] = 90.0 # Mặc định 90
 
-    if df.empty:
-        return pd.DataFrame(columns=['Ngày', 'Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']).set_index('Ngày')
+    # 2. Lọc nhật ký trong tuần được chọn
+    logs_week = df_logs[df_logs['Tuần'] == week_selected]
 
-    # Nếu chọn tuần → lọc dữ liệu theo tuần
-    if week_selected:
-        df = df[df['Tuần'] == week_selected]
+    if not logs_week.empty:
+        # Tổng hợp điểm từ Nhật ký Hành vi
+        daily_scores = logs_week.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
 
-    if df.empty:
-        # Tạo dataset rỗng để không lỗi
-        return pd.DataFrame(columns=['Ngày', 'Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']).set_index('Ngày')
+        # Đảm bảo có cả hai cột 'Vi phạm' và 'Hoạt động'
+        for col in ['Vi phạm', 'Hoạt động']:
+            if col not in daily_scores.columns:
+                daily_scores[col] = 0
 
-    # Gom điểm theo ngày
-    df_group = df.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
+        daily_scores = daily_scores.reset_index()
+        daily_scores = daily_scores.rename(columns={'Vi phạm': 'Điểm Vi phạm_new', 'Hoạt động': 'Điểm Hoạt động_new'})
+        
+        # 3. Merge daily_scores vào dataset 7 ngày
+        # Sử dụng how='left' để giữ lại tất cả 7 ngày trong tuần
+        dataset = dataset.merge(daily_scores[['Ngày', 'Điểm Vi phạm_new', 'Điểm Hoạt động_new']], 
+                                on='Ngày', 
+                                how='left')
+        
+        # 4. Cập nhật Điểm và Tính Hạnh kiểm
+        # Sử dụng dữ liệu mới (_new) nếu có, nếu không có (NaN sau merge) thì giữ 0 (Điểm Vi phạm/Hoạt động mặc định đã là 0)
+        # Điền 0 vào các cột _new (vì nếu không có merge thì chúng là NaN)
+        dataset['Điểm Vi phạm_new'] = dataset['Điểm Vi phạm_new'].fillna(0)
+        dataset['Điểm Hoạt động_new'] = dataset['Điểm Hoạt động_new'].fillna(0)
+        
+        # Ghi đè điểm Vi phạm/Hoạt động mặc định (0) bằng điểm mới (_new)
+        dataset['Điểm Vi phạm'] = dataset['Điểm Vi phạm_new']
+        dataset['Điểm Hoạt động'] = dataset['Điểm Hoạt động_new']
+        
+        # Tính lại Hạnh kiểm
+        dataset['Điểm Hạnh kiểm'] = 90 + dataset['Điểm Hoạt động'] - dataset['Điểm Vi phạm']
+        
+        # Xóa các cột tạm thời
+        dataset = dataset.drop(columns=['Điểm Vi phạm_new', 'Điểm Hoạt động_new'])
 
-    if 'Vi phạm' not in df_group.columns:
-        df_group['Vi phạm'] = 0
-    if 'Hoạt động' not in df_group.columns:
-        df_group['Hoạt động'] = 0
+    # 5. Đặt index và dọn dẹp cuối cùng
+    # Chuyển cột 'Ngày' thành Index kiểu Datetime (như yêu cầu ban đầu của hàm)
+    dataset = dataset.set_index('Ngày')
 
-    df_group = df_group.rename(columns={'Vi phạm': 'Điểm Vi phạm', 'Hoạt động': 'Điểm Hoạt động'})
-    df_group['Điểm Hạnh kiểm'] = 90 + df_group['Điểm Hoạt động'] - df_group['Điểm Vi phạm']
-    df_group.index = pd.to_datetime(df_group.index)
-
-    return df_group
+    return dataset
 
 def calculate_score(df):
     score = df['Điểm Hạnh kiểm'].mean().round(1)
@@ -373,29 +410,30 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
         return
 
     df_plot = data_df.copy()
-
-    # Lọc theo tuần cụ thể nếu cần
-    if week_selected:
-        df_plot = df_plot[df_plot.index.isocalendar().week == week_selected]
-
     df_plot = df_plot.sort_index()
 
-    # Chuyển index thành string để Altair hiển thị chuẩn
-    df_plot_for_chart = df_plot.copy()
-    df_plot_for_chart.index = df_plot_for_chart.index.strftime('%d/%m')
-
-    if selected_freq == "Ngày (Day)" or (selected_freq == "Tuần (Week)" and week_selected):
-        chart_data = df_plot_for_chart[cols]
+    # 1. Xử lý tần suất hiển thị (Aggregation)
+    if selected_freq == "Ngày (Day)":
+        chart_data = df_plot[cols] # Index là Datetime
         x_label = "Ngày"
+        x_type = 'T' # Temporal
     elif selected_freq == "Tuần (Week)":
+        # Groupby theo Tuần
         chart_data = df_plot[cols].groupby(df_plot.index.isocalendar().week).mean()
         chart_data.index = [f"Tuần {w}" for w in chart_data.index]
         x_label = "Tuần"
+        x_type = 'N' # Nominal (Index là string)
     else:  # Tháng
-        chart_data = df_plot.resample('M').mean()
+        chart_data = df_plot[cols].resample('M').mean()
         chart_data.index = chart_data.index.strftime('%m/%Y')
         x_label = "Tháng"
+        x_type = 'N' # Nominal (Index là string)
 
+    # 2. Tính toán và Hiển thị Score / Xếp loại
+    if chart_data.empty:
+        st.info("⛔ Không có dữ liệu để phân tích trong khoảng thời gian này.")
+        return
+        
     current_score = chart_data['Điểm Hạnh kiểm'].iloc[-1]
 
     if current_score >= 90:
@@ -409,22 +447,38 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
         f"**Xếp loại Hạnh kiểm:** <span style='color:{color}; font-size:24px;'>{behavior_class}</span>",
         unsafe_allow_html=True
     )
-    st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score}")
+    st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score:.1f}")
 
-    # Biểu đồ
-    chart_data_long = chart_data.reset_index().melt(chart_data.index.name or 'Ngày', var_name='Loại Điểm', value_name='Điểm số')
+    # 3. Biểu đồ Altair
+    # Reset index để 'Ngày/Tuần/Tháng' trở thành cột, sau đó melt
+    chart_data_long = chart_data.reset_index().melt(
+        chart_data.index.name or 'Ngày', 
+        var_name='Loại Điểm', 
+        value_name='Điểm số'
+    )
+    # Đảm bảo tên cột là 'Ngày' 
     chart_data_long.rename(columns={chart_data.index.name or 'Ngày': 'Ngày'}, inplace=True)
+    
+    # Mã hóa trục X
+    if x_type == 'T':
+        # Đối với ngày (Temporal), sử dụng kiểu T
+        x_encoding = alt.X('Ngày:T', title=x_label) 
+    else:
+        # Đối với Tuần/Tháng (Nominal), sử dụng kiểu N và tắt sorting mặc định
+        x_encoding = alt.X('Ngày:N', title=x_label, sort=None) 
+        chart_data_long['Ngày'] = chart_data_long['Ngày'].astype(str) 
 
     selection = alt.selection_point(fields=['Loại Điểm'], bind='legend')
+    
     chart = (
         alt.Chart(chart_data_long)
         .mark_line(point=True, strokeWidth=3)
         .encode(
-            x=alt.X('Ngày:N', title=x_label),
+            x=x_encoding,
             y=alt.Y('Điểm số:Q', title=None),
             color='Loại Điểm:N',
             opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
-            tooltip=['Ngày:N', 'Loại Điểm', 'Điểm số']
+            tooltip=['Ngày:N', 'Loại Điểm', 'Điểm số:Q']
         )
         .add_params(selection)
         .interactive()
@@ -502,6 +556,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
