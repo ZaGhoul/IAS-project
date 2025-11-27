@@ -123,15 +123,14 @@ def render_data_management_page():
         st.subheader("Cấu hình")
         table_option = st.radio(
             "Chọn Bảng Dữ liệu:",
-            ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi", "⚠️ Danh mục Vi phạm", "🏆 Danh mục Hoạt động"],
-            key="table_selector_mgmt"
+            ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi", "⚠️ Danh mục Vi phạm", "🏆 Danh mục Hoạt động"]
         )
         st.markdown("---")
         
         selected_week = 3
         if table_option in ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi"]:
             st.info("Bộ lọc Thời gian")
-            selected_week = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3, key="week_input_mgmt")
+            selected_week = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3)
             st.caption(f"Dữ liệu Tuần {selected_week}")
             st.session_state['selected_week'] = selected_week
 
@@ -167,81 +166,49 @@ def render_data_management_page():
                 }
             )
 
-            # --- KHÔI PHỤC LOGIC CHUYỂN TRANG (Phân tích Ngay) ---
-            st.markdown("### 🚀 Tác vụ Phân tích")
-            student_dict = dict(zip(df_students['MaHS'], df_students['Họ và tên']))
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                target_hs = st.selectbox(
-                    "Chọn hồ sơ:", 
-                    list(student_dict.keys()), 
-                    format_func=lambda x: f"{student_dict[x]} ({x})",
-                    key="target_student_select_mgmt"
-                )
-            with c2:
-                st.write("")
-                st.write("")
-                if st.button("Phân tích Ngay ▶️", type="primary"):
-                    st.session_state['selected_student_id'] = target_hs
-                    st.session_state['current_page'] = 'dashboard'
-                    st.rerun() # Thay thế st.experimental_rerun()
-            # --------------------------------------------------
-
         # ===================
         # B. Bảng Nhật ký Hành vi
         # ===================
         elif table_option == "📝 Nhật ký Hành vi":
             st.subheader(f"📝 Quản lý Nhật ký Hành vi Tuần {selected_week}")
             df_logs = st.session_state['df_logs'].copy()
-
-            # --- Thêm nhật ký mới (Logic giữ nguyên, thêm key cho ổn định) ---
+        
+            # --- Thêm nhật ký mới ---
             st.markdown("##### ➕ Thêm Nhật ký Mới")
             df_students = st.session_state['df_students_master']
             hs_dict = dict(zip(df_students['MaHS'], df_students['Họ và tên']))
-
-            c_form_1, c_form_2, c_form_3, c_form_4 = st.columns([2, 1.5, 2.5, 1])
-            with c_form_1:
-                new_mahs = st.selectbox("Học sinh", list(hs_dict.keys()), format_func=lambda x: f"{hs_dict[x]} ({x})", key="new_mahs_log")
-            with c_form_2:
-                new_type = st.selectbox("Loại hành vi", ["Vi phạm", "Hoạt động"], key="new_type_log")
-            
-            content_source = st.session_state['df_violations'] if new_type == 'Vi phạm' else st.session_state['df_achievements']
-            content_col = 'Tên Vi phạm' if new_type == 'Vi phạm' else 'Tên Hoạt động'
-            
-            with c_form_3:
-                new_content = st.selectbox("Nội dung chi tiết", content_source[content_col].tolist(), key="new_content_log")
-            
-            auto_score = int(content_source.loc[content_source[content_col] == new_content, 'Điểm'].values[0])
-            with c_form_4:
-                new_score = st.number_input("Điểm", value=auto_score, key="new_score_log")
-            
-            c_form_5, c_form_6 = st.columns([2, 6])
-            with c_form_5:
-                new_date = st.date_input("Ngày", datetime.date.today(), key="new_date_log")
-            with c_form_6:
-                st.write("")
-                st.write("")
-                if st.button("💾 Lưu vào CSDL", type="primary", key="save_log_button"):
-                    next_stt = df_logs['STT'].max() + 1 if not df_logs.empty else 1
-                    new_week = new_date.isocalendar()[1]
-                    new_row = {
-                        'STT': next_stt,
-                        'Ngày': pd.Timestamp(new_date),
-                        'MaHS': str(new_mahs),
-                        'Loại': str(new_type),
-                        'Nội dung': str(new_content),
-                        'Điểm': float(new_score),
-                        'Tuần': int(new_week)
-                    }
-                    df_logs = pd.concat([df_logs, pd.DataFrame([new_row])], ignore_index=True)
-                    st.session_state['df_logs'] = df_logs
-                    # df_logs.to_csv("logs.csv", index=False) # Không thể ghi file trên môi trường này
-                    st.success("Đã thêm mới thành công!")
-                    st.rerun() 
-
+            new_mahs = st.selectbox("Học sinh", list(hs_dict.keys()), format_func=lambda x: f"{hs_dict[x]} ({x})")
+            new_type = st.selectbox("Loại hành vi", ["Vi phạm", "Hoạt động"])
+            content_source = st.session_state['df_violations'] if new_type=='Vi phạm' else st.session_state['df_achievements']
+            content_col = 'Tên Vi phạm' if new_type=='Vi phạm' else 'Tên Hoạt động'
+            new_content = st.selectbox("Nội dung chi tiết", content_source[content_col].tolist())
+            auto_score = int(content_source.loc[content_source[content_col]==new_content, 'Điểm'].values[0])
+            new_score = st.number_input("Điểm", value=auto_score)
+            new_date = st.date_input("Ngày", datetime.date.today())
+            new_week = new_date.isocalendar()[1]
+        
+            if st.button("💾 Lưu vào CSDL"):
+                # Tạo STT
+                next_stt = df_logs['STT'].max() + 1 if not df_logs.empty else 1
+                new_row = {
+                    'STT': next_stt,
+                    'Ngày': pd.Timestamp(new_date),
+                    'MaHS': str(new_mahs),
+                    'Loại': str(new_type),
+                    'Nội dung': str(new_content),
+                    'Điểm': float(new_score),
+                    'Tuần': int(new_week)
+                }
+                df_logs = pd.concat([df_logs, pd.DataFrame([new_row])], ignore_index=True)
+                st.session_state['df_logs'] = df_logs
+                # Lưu ra CSV để reload không mất
+                df_logs.to_csv("logs.csv", index=False)
+                st.success("Đã thêm mới thành công!")
+                st.experimental_rerun()
+        
             # --- Hiển thị bảng nhật ký ---
             logs_week = df_logs[df_logs['Tuần'] == selected_week].copy()
-
+        
             # ---- Fix kiểu dữ liệu cho Streamlit ----
             logs_week['STT'] = logs_week['STT'].astype(int)
             logs_week['MaHS'] = logs_week['MaHS'].astype(str)
@@ -249,39 +216,28 @@ def render_data_management_page():
             logs_week['Nội dung'] = logs_week['Nội dung'].astype(str)
             logs_week['Điểm'] = logs_week['Điểm'].fillna(0).astype(float)
             logs_week['Tuần'] = logs_week['Tuần'].astype(int)
-            
-            # SỬA LỖI VALUEERROR TẠI ĐÂY: Bỏ pd.to_datetime dư thừa
-            logs_week['Ngày'] = logs_week['Ngày'].dt.strftime('%Y-%m-%d') 
+            # --- fix ValueError nếu dữ liệu trộn string + Timestamp ---
+            logs_week['Ngày'] = pd.to_datetime(logs_week['Ngày'], errors='coerce').dt.strftime('%Y-%m-%d')
+        
+            st.dataframe(logs_week, use_container_width=True)
 
-            edited_logs_data = st.data_editor(
-                logs_week, 
-                use_container_width=True, 
-                num_rows="dynamic",
-                key="log_editor_mgmt"
-            )
-            
-            # Logic update sau khi edit
-            if not edited_logs_data.equals(logs_week):
-                df_other_weeks = df_logs[df_logs['Tuần'] != selected_week]
-                st.session_state['df_logs'] = pd.concat([df_other_weeks, edited_logs_data], ignore_index=True)
-                st.rerun()
 
         # ===================
         # C. Danh mục Vi phạm / Hoạt động
         # ===================
         elif table_option == "⚠️ Danh mục Vi phạm":
             st.subheader("Quản lý Danh mục Vi phạm")
-            edited_vp = st.data_editor(st.session_state['df_violations'], num_rows="dynamic", use_container_width=True, key="editor_vp_mgmt")
+            edited_vp = st.data_editor(st.session_state['df_violations'], num_rows="dynamic", use_container_width=True)
             if not edited_vp.equals(st.session_state['df_violations']):
                 st.session_state['df_violations'] = edited_vp
-                st.rerun() 
+                st.experimental_rerun()
 
         elif table_option == "🏆 Danh mục Hoạt động":
             st.subheader("Quản lý Danh mục Hoạt động")
-            edited_tc = st.data_editor(st.session_state['df_achievements'], num_rows="dynamic", use_container_width=True, key="editor_tc_mgmt")
+            edited_tc = st.data_editor(st.session_state['df_achievements'], num_rows="dynamic", use_container_width=True)
             if not edited_tc.equals(st.session_state['df_achievements']):
                 st.session_state['df_achievements'] = edited_tc
-                st.rerun()
+                st.experimental_rerun()
 
 
 
@@ -521,8 +477,6 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
-
-
 
 
 
