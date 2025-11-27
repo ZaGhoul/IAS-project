@@ -230,46 +230,62 @@ def render_data_management_page():
 # 4. LOGIC TRANG 2: DASHBOARD IAS
 # ==========================================
 def build_behavior_dataset(ma_hs, week_selected):
+    """
+    Trả về DataFrame gồm 7 ngày trong tuần week_selected
+    với các cột: 'Ngày', 'Vi phạm', 'Hoạt động', 'Hạnh kiểm'
+    """
     df_logs = st.session_state['df_logs'].copy()
-    df_logs['Ngày'] = pd.to_datetime(df_logs['Ngày'], errors='coerce')
+    # Đảm bảo cột Ngày là kiểu datetime
+    df_logs['Ngày'] = pd.to_datetime(df_logs['Ngày'], errors='coerce') 
     df_logs = df_logs.dropna(subset=['Ngày'])
     df_logs = df_logs[df_logs['MaHS'] == ma_hs].copy()
-    df_logs['Tuần'] = df_logs['Ngày'].dt.isocalendar().week
+    
+    # Tính toán lại Tuần (để đảm bảo không có lỗi)
+    df_logs['Tuần'] = df_logs['Ngày'].dt.isocalendar().week.astype(int) 
 
-    # Tạo 7 ngày trong tuần
+    # 1. Tạo 7 ngày trong tuần
+    # Tìm ngày đầu tiên của tuần (Giả sử năm 2025)
     first_day_of_week = pd.to_datetime(f'2025-W{week_selected}-1', format='%G-W%V-%u')
     week_dates = pd.date_range(first_day_of_week, periods=7, freq='D')
     dataset = pd.DataFrame({'Ngày': week_dates})
 
-    # Tạo cột mặc định
-    dataset['Vi phạm'] = 0
-    dataset['Hoạt động'] = 0
-    dataset['Hạnh kiểm'] = 90
-
-    # Lọc nhật ký trong tuần
+    # 2. Tổng hợp điểm từ Nhật ký Hành vi
     logs_week = df_logs[df_logs['Tuần'] == week_selected]
+
     if not logs_week.empty:
+        # Tổng hợp theo ngày và loại (Vi phạm / Hoạt động)
         daily_scores = logs_week.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
 
-        # đảm bảo có cả 2 cột
+        # Đảm bảo có cả hai cột 'Vi phạm' và 'Hoạt động'
         for col in ['Vi phạm', 'Hoạt động']:
             if col not in daily_scores.columns:
                 daily_scores[col] = 0
 
-        # Ép kiểu ngày để merge chính xác
         daily_scores = daily_scores.reset_index()
-        daily_scores['Ngày'] = pd.to_datetime(daily_scores['Ngày'])
 
-        # Merge
+        # 3. Merge vào dataset. Dữ liệu scores sẽ được thêm với hậu tố _y
+        # Cột Hoạt động, Vi phạm trong dataset ban đầu không cần thiết vì sẽ bị ghi đè.
         dataset = dataset.merge(daily_scores[['Ngày','Vi phạm','Hoạt động']], on='Ngày', how='left')
 
-        # Fill na và tính Hạnh kiểm
-        dataset['Vi phạm'] = dataset['Vi phạm'].fillna(0)
-        dataset['Hoạt động'] = dataset['Hoạt động'].fillna(0)
+        # === FIX LỖI KEYERROR TẠI ĐÂY ===
+        # Thay vì dùng cột 'Vi phạm' (đã bị đổi tên thành 'Vi phạm_x' do merge),
+        # ta dùng cột 'Vi phạm_y' và 'Hoạt động_y' (là dữ liệu điểm mới nhất)
+        dataset['Vi phạm'] = dataset['Vi phạm_y'].fillna(0)
+        dataset['Hoạt động'] = dataset['Hoạt động_y'].fillna(0)
+        
+        # 4. Tính hạnh kiểm và dọn dẹp
         dataset['Hạnh kiểm'] = 90 + dataset['Hoạt động'] - dataset['Vi phạm']
+        
+        # Xóa các cột tạm thời do merge sinh ra
+        dataset = dataset.drop(columns=['Vi phạm_y', 'Hoạt động_y'])
+        
+    else:
+        # Nếu không có log trong tuần, tạo giá trị mặc định (90 điểm Hạnh kiểm)
+        dataset['Vi phạm'] = 0
+        dataset['Hoạt động'] = 0
+        dataset['Hạnh kiểm'] = 90
 
     return dataset
-
 
 
 def calculate_score(df):
@@ -454,6 +470,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
