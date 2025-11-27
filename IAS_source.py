@@ -116,9 +116,6 @@ def render_data_management_page():
     
     col_ctrl, col_data = st.columns([1.2, 4])
     
-    # ===================
-    # Bảng dữ liệu + Bộ lọc tuần
-    # ===================
     with col_ctrl:
         st.subheader("Cấu hình")
         table_option = st.radio(
@@ -127,147 +124,223 @@ def render_data_management_page():
         )
         st.markdown("---")
         
+        # Chỉ hiện bộ lọc thời gian cho Học sinh và Nhật ký
         selected_week = 3
         if table_option in ["👨‍🎓 Học sinh", "📝 Nhật ký Hành vi"]:
             st.info("Bộ lọc Thời gian")
             selected_week = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3)
             st.caption(f"Dữ liệu Tuần {selected_week}")
-            st.session_state['selected_week'] = selected_week
 
     with col_data:
-        # ===================
-        # A. Bảng Học sinh
-        # ===================
+        # ---------------------------------------------------------
+        # A. BẢNG HỌC SINH (MASTER DATA)
+        # ---------------------------------------------------------
         if table_option == "👨‍🎓 Học sinh":
             st.subheader(f"Danh sách Học sinh & Điểm Tuần {selected_week}")
-            df_students = st.session_state['df_students_master'].copy()
+            
+            # Tính điểm (Logic cũ)
+            df_display = st.session_state['df_students_master'].copy()
             df_logs = st.session_state['df_logs']
-
-            # Tính điểm tuần
-            logs_week = df_logs[df_logs['Tuần'] == selected_week]
-            scores = logs_week.groupby(['MaHS', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
+            df_logs_week = df_logs[df_logs['Tuần'] == selected_week]
+            scores = df_logs_week.groupby(['MaHS', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
+            
             if not scores.empty:
-                for col in ['Hoạt động', 'Vi phạm']:
-                    if col not in scores.columns: scores[col] = 0
-                df_students = df_students.merge(scores, on='MaHS', how='left').fillna(0)
+                if 'Hoạt động' not in scores.columns: scores['Hoạt động'] = 0
+                if 'Vi phạm' not in scores.columns: scores['Vi phạm'] = 0
+                df_display = df_display.merge(scores, on='MaHS', how='left').fillna(0)
             else:
-                df_students['Hoạt động'] = 0
-                df_students['Vi phạm'] = 0
-
-            df_students['Hạnh kiểm'] = 90 + df_students['Hoạt động'] - df_students['Vi phạm']
-
+                df_display['Hoạt động'] = 0
+                df_display['Vi phạm'] = 0
+            df_display['Hạnh kiểm'] = 90 + df_display['Hoạt động'] - df_display['Vi phạm']
+            
+            # Hiển thị
             st.dataframe(
-                df_students, use_container_width=True, hide_index=True,
+                df_display, use_container_width=True, hide_index=True,
                 column_config={
                     "Hạnh kiểm": st.column_config.ProgressColumn("Hạnh kiểm", format="%d", min_value=0, max_value=120)
                 }
             )
+            
+            # Form thêm học sinh (CRUD đơn giản)
+            with st.expander("➕ Thêm/Sửa Học sinh"):
+                st.info("Để sửa, hãy chỉnh trực tiếp ở bảng 'Danh mục' nếu cần (demo rút gọn).")
 
-        # ===================
-        # B. Bảng Nhật ký Hành vi
-        # ===================
+            # Chuyển trang Phân tích
+            st.markdown("### 🚀 Tác vụ Phân tích")
+            student_dict = dict(zip(df_display['MaHS'], df_display['Họ và tên']))
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                target_hs = st.selectbox("Chọn hồ sơ:", list(student_dict.keys()), format_func=lambda x: f"{student_dict[x]} ({x})")
+            with c2:
+                st.write("")
+                st.write("")
+                if st.button("Phân tích Ngay", type="primary"):
+                    st.session_state['selected_student_id'] = target_hs
+                    st.session_state['current_page'] = 'dashboard'
+                    st.rerun()
+
+
+
+        # ---------------------------------------------------------
+        # B. BẢNG NHẬT KÝ HÀNH VI (CRUD NÂNG CAO - HEIDI STYLE)
+        # ---------------------------------------------------------
         elif table_option == "📝 Nhật ký Hành vi":
-            st.subheader(f"📝 Quản lý Nhật ký Hành vi Tuần {selected_week}")
+            st.subheader("📝 Quản lý Nhật ký Hành vi")
+
+            # --- 1. FORM NHẬP LIỆU THÔNG MINH (Thay thế cho việc nhập trực tiếp khó khăn) ---
+            with st.container():
+                st.markdown("##### ➕ Thêm Nhật ký Mới")
+                
+                # Lấy danh sách Học sinh cho Dropdown
+                list_hs = st.session_state['df_students_master']
+                hs_options = list_hs['MaHS'].tolist()
+                hs_labels = list_hs['Họ và tên'].tolist()
+                hs_dict = dict(zip(hs_options, hs_labels))
+                
+                c_form_1, c_form_2, c_form_3, c_form_4 = st.columns([2, 1.5, 2.5, 1])
+                
+                with c_form_1:
+                    # Dropdown chọn Học sinh (Hiện cả Tên và Mã)
+                    new_mahs = st.selectbox("Học sinh", hs_options, format_func=lambda x: f"{hs_dict[x]} ({x})")
+                
+                with c_form_2:
+                    # Dropdown Loại
+                    new_type = st.selectbox("Loại hành vi", ["Vi phạm", "Hoạt động"])
+                
+                with c_form_3:
+                    # Dropdown Nội dung (Phụ thuộc vào Loại)
+                    if new_type == "Vi phạm":
+                        content_source = st.session_state['df_violations']
+                        content_col = 'Tên Vi phạm'
+                    else:
+                        content_source = st.session_state['df_achievements']
+                        content_col = 'Tên Hoạt động'
+                        
+                    content_options = content_source[content_col].tolist()
+                    new_content = st.selectbox("Nội dung chi tiết", content_options)
+                    
+                    # Tự động lấy điểm tương ứng
+                    auto_score = content_source.loc[content_source[content_col] == new_content, 'Điểm'].values[0]
+
+                with c_form_4:
+                    # Điểm (Tự động điền nhưng có thể sửa)
+                    new_score = st.number_input("Điểm", value=int(auto_score))
+
+                c_form_5, c_form_6 = st.columns([2, 6])
+                with c_form_5:
+                    new_date = st.date_input("Ngày", datetime.date.today())
+                with c_form_6:
+                    st.write("") 
+                    st.write("") 
+                    if st.button("💾 Lưu vào CSDL", type="primary"):
+                        # Logic Auto-Increment STT
+                        current_max_stt = 0
+                        if not st.session_state['df_logs'].empty:
+                            current_max_stt = st.session_state['df_logs']['STT'].max()
+                        
+                        new_row = {
+                            'STT': current_max_stt + 1, # Tự tăng
+                            'Ngày': new_date,
+                            'MaHS': new_mahs,
+                            'Loại': new_type,
+                            'Nội dung': new_content,
+                            'Điểm': new_score,
+                            'Tuần': new_date.isocalendar()[1]
+                        }
+                        # Thêm vào DataFrame
+                        st.session_state['df_logs'] = pd.concat([st.session_state['df_logs'], pd.DataFrame([new_row])], ignore_index=True)
+                        st.success("Đã thêm mới thành công!")
+                        st.rerun()
+
+            st.markdown("---")
+
+            # --- 2. HIỂN THỊ BẢNG DỮ LIỆU (Cho phép Xóa/Sửa nhẹ) ---
+            st.markdown(f"**Dữ liệu Tuần {selected_week}** (Bạn có thể sửa trực tiếp Ngày/Điểm hoặc Xóa dòng)")
+            
+            # Lọc hiển thị nhưng vẫn giữ index gốc để update
             df_logs = st.session_state['df_logs']
+            
+            # Hiển thị bảng Editor
+            edited_logs = st.data_editor(
+                df_logs[df_logs['Tuần'] == selected_week], # Chỉ hiện tuần chọn
+                num_rows="dynamic", # Cho phép thêm/xóa dòng
+                use_container_width=True,
+                key="log_editor",
+                column_config={
+                    "MaHS": st.column_config.TextColumn("Mã HS", disabled=True), # Khóa cột mã để tránh lỗi
+                    "Loại": st.column_config.TextColumn("Loại", disabled=True),
+                    "Nội dung": st.column_config.TextColumn("Nội dung", disabled=True),
+                    "STT": st.column_config.NumberColumn("STT", disabled=True),
+                }
+            )
+            
+            # Logic Cập nhật Session State khi sửa/xóa dưới bảng
 
-            # --- Thêm nhật ký mới ---
-            st.markdown("##### ➕ Thêm Nhật ký Mới")
-            df_students = st.session_state['df_students_master']
-            hs_dict = dict(zip(df_students['MaHS'], df_students['Họ và tên']))
-            new_mahs = st.selectbox("Học sinh", list(hs_dict.keys()), format_func=lambda x: f"{hs_dict[x]} ({x})")
-            new_type = st.selectbox("Loại hành vi", ["Vi phạm", "Hoạt động"])
-            content_source = st.session_state['df_violations'] if new_type=='Vi phạm' else st.session_state['df_achievements']
-            content_col = 'Tên Vi phạm' if new_type=='Vi phạm' else 'Tên Hoạt động'
-            new_content = st.selectbox("Nội dung chi tiết", content_source[content_col].tolist())
-            auto_score = int(content_source.loc[content_source[content_col]==new_content, 'Điểm'].values[0])
-            new_score = st.number_input("Điểm", value=auto_score)
-            new_date = st.date_input("Ngày", datetime.date.today())
-            new_week = new_date.isocalendar()[1]
-
-            if st.button("💾 Lưu vào CSDL"):
-                # Tạo STT
-                next_stt = df_logs['STT'].max() + 1 if not df_logs.empty else 1
-                new_row = {'STT': next_stt, 'Ngày': new_date, 'MaHS': new_mahs,
-                           'Loại': new_type, 'Nội dung': new_content, 'Điểm': new_score,
-                           'Tuần': new_week}
-                df_logs = pd.concat([df_logs, pd.DataFrame([new_row])], ignore_index=True)
-                st.session_state['df_logs'] = df_logs
-                # Lưu ra CSV để reload không mất
-                df_logs.to_csv("logs.csv", index=False)
-                st.success("Đã thêm mới thành công!")
-                st.experimental_rerun()
-
-            # --- Hiển thị bảng nhật ký ---
-            logs_week = df_logs[df_logs['Tuần'] == selected_week]
-            st.dataframe(logs_week, use_container_width=True)
-
-        # ===================
-        # C. Danh mục Vi phạm / Hoạt động
-        # ===================
+        # ---------------------------------------------------------
+        # C. BẢNG DANH MỤC (VI PHẠM / Hoạt động) - CRUD HOÀN CHỈNH
+        # ---------------------------------------------------------
         elif table_option == "⚠️ Danh mục Vi phạm":
             st.subheader("Quản lý Danh mục Vi phạm")
-            edited_vp = st.data_editor(st.session_state['df_violations'], num_rows="dynamic", use_container_width=True)
+            st.info("💡 Bảng này là bảng Tĩnh, dùng chung cho cả năm học.")
+            
+            edited_vp = st.data_editor(
+                st.session_state['df_violations'],
+                num_rows="dynamic", # Cho phép Thêm/Xóa dòng
+                use_container_width=True,
+                key="editor_vp"
+            )
+            # Cập nhật lại session state ngay lập tức nếu có thay đổi
             if not edited_vp.equals(st.session_state['df_violations']):
                 st.session_state['df_violations'] = edited_vp
-                st.experimental_rerun()
+                st.rerun()
 
         elif table_option == "🏆 Danh mục Hoạt động":
             st.subheader("Quản lý Danh mục Hoạt động")
-            edited_tc = st.data_editor(st.session_state['df_achievements'], num_rows="dynamic", use_container_width=True)
+            st.info("💡 Bảng này là bảng Tĩnh, dùng chung cho cả năm học.")
+            
+            edited_tc = st.data_editor(
+                st.session_state['df_achievements'],
+                num_rows="dynamic",
+                use_container_width=True,
+                key="editor_tc"
+            )
             if not edited_tc.equals(st.session_state['df_achievements']):
                 st.session_state['df_achievements'] = edited_tc
-                st.experimental_rerun()
-
+                st.rerun()
 
 # ==========================================
 # 4. LOGIC TRANG 2: DASHBOARD IAS
 # ==========================================
 def build_behavior_dataset(ma_hs, week_selected=None):
-    logs_df = st.session_state['df_logs'].copy()
-    logs_df = logs_df[logs_df['MaHS'] == ma_hs]
+    df_logs = st.session_state['df_logs']
 
-    if logs_df.empty:
-        # Không có nhật ký, tạo DataFrame trống với index theo tuần nếu cần
-        start_date = pd.Timestamp('2025-01-01')
-        end_date = pd.Timestamp('2025-12-31')
-        date_index = pd.date_range(start_date, end_date)
-        df = pd.DataFrame(index=date_index, columns=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'])
-        df.fillna(0, inplace=True)
-        df['Điểm Hạnh kiểm'] = 90
-        return df
+    # Chỉ lấy dữ liệu học sinh này
+    df = df_logs[df_logs['MaHS'] == ma_hs].copy()
 
-    # Đặt cột Ngày làm index
-    logs_df['Ngày'] = pd.to_datetime(logs_df['Ngày'])
-    logs_df.set_index('Ngày', inplace=True)
-    logs_df.sort_index(inplace=True)
+    if df.empty:
+        return pd.DataFrame(columns=['Ngày', 'Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']).set_index('Ngày')
 
-    # Lấy dải ngày cần vẽ
+    # Nếu chọn tuần → lọc dữ liệu theo tuần
     if week_selected:
-        week_dates = pd.date_range(
-            start=logs_df.index.min().normalize(),
-            end=logs_df.index.max().normalize()
-        )
-        # Chỉ lấy tuần được chọn
-        week_dates = [d for d in week_dates if d.isocalendar().week == week_selected]
-        if not week_dates:
-            week_dates = pd.date_range(start=logs_df.index.min(), end=logs_df.index.max())
-    else:
-        week_dates = pd.date_range(start=logs_df.index.min(), end=logs_df.index.max())
+        df = df[df['Tuần'] == week_selected]
 
-    df = pd.DataFrame(index=week_dates, columns=['Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm'])
-    df.fillna(0, inplace=True)
-    df['Điểm Hạnh kiểm'] = 90  # mặc định 90
+    if df.empty:
+        # Tạo dataset rỗng để không lỗi
+        return pd.DataFrame(columns=['Ngày', 'Điểm Vi phạm', 'Điểm Hoạt động', 'Điểm Hạnh kiểm']).set_index('Ngày')
 
-    for d in week_dates:
-        day_logs = logs_df[logs_df.index == d]
-        if not day_logs.empty:
-            vi_pham = day_logs[day_logs['Loại'] == 'Vi phạm']['Điểm'].sum()
-            hoat_dong = day_logs[day_logs['Loại'] == 'Hoạt động']['Điểm'].sum()
-            df.at[d, 'Điểm Vi phạm'] = vi_pham
-            df.at[d, 'Điểm Hoạt động'] = hoat_dong
-            df.at[d, 'Điểm Hạnh kiểm'] = 90 - vi_pham + hoat_dong
+    # Gom điểm theo ngày
+    df_group = df.groupby(['Ngày', 'Loại'])['Điểm'].sum().unstack(fill_value=0)
 
-    return df
+    if 'Vi phạm' not in df_group.columns:
+        df_group['Vi phạm'] = 0
+    if 'Hoạt động' not in df_group.columns:
+        df_group['Hoạt động'] = 0
+
+    df_group = df_group.rename(columns={'Vi phạm': 'Điểm Vi phạm', 'Hoạt động': 'Điểm Hoạt động'})
+    df_group['Điểm Hạnh kiểm'] = 90 + df_group['Điểm Hoạt động'] - df_group['Điểm Vi phạm']
+    df_group.index = pd.to_datetime(df_group.index)
+
+    return df_group
 
 def calculate_score(df):
     score = df['Điểm Hạnh kiểm'].mean().round(1)
@@ -361,43 +434,34 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
 
 def render_ias_dashboard_page():
     st.title("💡 PHÂN TÍCH HÀNH VI CÁ NHÂN (IAS)")
-
     df_students = st.session_state['df_students_master']
     student_options_list = df_students.apply(lambda x: f"{x['Họ và tên']} ({x['MaHS']})", axis=1).tolist()
     default_index = 0
-    if st.session_state.get('selected_student_id'):
+    if st.session_state['selected_student_id']:
         ma_hs_target = st.session_state['selected_student_id']
         found_row = df_students[df_students['MaHS'] == ma_hs_target]
         if not found_row.empty:
             target_string = f"{found_row.iloc[0]['Họ và tên']} ({found_row.iloc[0]['MaHS']})"
-            if target_string in student_options_list: 
-                default_index = student_options_list.index(target_string)
+            if target_string in student_options_list: default_index = student_options_list.index(target_string)
 
     col1, col2, col3 = st.columns([2,3,2.5])
-
-    # --------------------- CỘT 1: Hồ sơ ---------------------
     with col1:
         st.header("1. Hồ sơ")
         selected_student_str = st.selectbox("Học sinh:", student_options_list, index=default_index)
         ma_hs = selected_student_str.split('(')[1].replace(')', '')
         st.session_state['selected_student_id'] = ma_hs
 
-        week_selected = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=st.session_state.get('selected_week', 3))
-        st.session_state['selected_week'] = week_selected
+        week_selected = st.number_input("Chọn Tuần (Năm 2025):", min_value=1, max_value=52, value=3)
 
         info = df_students[df_students['MaHS'] == ma_hs].iloc[0]
-        st.markdown(f"**Họ tên:** {info['Họ và tên']}")
-        st.markdown(f"**Lớp:** {info['Lớp']}")
-        st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
+        st.markdown(f"**Họ tên:** {info['Họ và tên']}"); st.markdown(f"**Lớp:** {info['Lớp']}"); st.markdown(f"**Ngày sinh:** {info['Ngày sinh']}")
 
-    # --------------------- CỘT 2: Phân tích cốt lõi ---------------------
     with col2:
         st.header("2. Phân tích Cốt lõi")
-        selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"], key="freq_select")
+        selected_freq = st.selectbox("Tần suất:", ["Ngày (Day)", "Tuần (Week)", "Tháng (Month)"])
         data_chart = build_behavior_dataset(ma_hs, week_selected)
         display_core_analysis(data_chart, selected_freq, week_selected=week_selected)
 
-    # --------------------- CỘT 3: Đề xuất ---------------------
     with col3:
         st.header("3. Đề xuất")
         if not data_chart.empty:
@@ -438,7 +502,6 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
-
 
 
 
