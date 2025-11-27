@@ -405,29 +405,35 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
 
     # 1. Xử lý tần suất hiển thị (Aggregation)
     if selected_freq == "Ngày (Day)":
-        chart_data = df_plot[cols] # Index là Datetime
+        chart_data = df_plot[cols] 
         x_label = "Ngày"
-        x_type = 'T' # Temporal (Để vẽ đường xu hướng đúng)
+        x_type = 'T' 
     elif selected_freq == "Tuần (Week)":
-        # Groupby theo Tuần và tính trung bình
+        # Aggregate theo tuần và reset index, sau đó đổi tên cột
         chart_data = df_plot[cols].groupby(df_plot.index.isocalendar().week).mean()
-        chart_data.index = [f"Tuần {w}" for w in chart_data.index]
+        chart_data = chart_data.reset_index() # Cột mới tên là 'week' (từ isocalendar())
+        chart_data.rename(columns={'week': 'Ngày'}, inplace=True) # Đổi tên thành 'Ngày' để melt dễ dàng
+        
+        # Format index sau khi đổi tên
+        chart_data['Ngày'] = chart_data['Ngày'].apply(lambda w: f"Tuần {w}")
+        chart_data = chart_data.set_index('Ngày') # Đặt lại index là chuỗi 'Tuần x'
+
         x_label = "Tuần"
-        x_type = 'N' # Nominal (Index là string)
+        x_type = 'N' # Nominal
     else:  # Tháng
-        # Resample theo Tháng và tính trung bình
         chart_data = df_plot[cols].resample('M').mean()
         chart_data.index = chart_data.index.strftime('%m/%Y')
         x_label = "Tháng"
-        x_type = 'N' # Nominal (Index là string)
+        x_type = 'N' # Nominal
 
     # 2. Tính toán và Hiển thị Score / Xếp loại
     if chart_data.empty:
         st.info("⛔ Không có dữ liệu để phân tích trong khoảng thời gian này.")
         return
         
-    current_score = chart_data['Điểm Hạnh kiểm'].mean().round(1)
-    # (Giữ nguyên logic xếp loại A/B/C)
+    # FIX: Dùng average (mean) của Hạnh kiểm để tính Xếp loại.
+    current_score = chart_data['Điểm Hạnh kiểm'].mean().round(1) 
+
     if current_score >= 90:
         behavior_class, color = "A - Tốt", "#4CAF50"
     elif current_score >= 80:
@@ -442,19 +448,18 @@ def display_core_analysis(data_df, selected_freq, week_selected=None):
     st.metric(label=f"Điểm Hạnh kiểm ({x_label} hiện tại)", value=f"{current_score:.1f}")
 
     # 3. Biểu đồ Altair
+    # Luôn reset index để cột Ngày/Tuần/Tháng xuất hiện với tên là 'Ngày'
     chart_data_long = chart_data.reset_index().melt(
-        chart_data.index.name or 'Ngày', 
+        # FIX: Dùng tên cột index mới là 'Ngày'
+        'Ngày', 
         var_name='Loại Điểm', 
         value_name='Điểm số'
     )
-    chart_data_long.rename(columns={chart_data.index.name or 'Ngày': 'Ngày'}, inplace=True)
     
     # Mã hóa trục X
     if x_type == 'T':
-        # Đối với ngày (Temporal)
         x_encoding = alt.X('Ngày:T', title=x_label) 
     else:
-        # Đối với Tuần/Tháng (Nominal)
         x_encoding = alt.X('Ngày:N', title=x_label, sort=None) 
         chart_data_long['Ngày'] = chart_data_long['Ngày'].astype(str) 
 
@@ -546,6 +551,7 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
 
 
