@@ -377,7 +377,7 @@ def render_ias_dashboard_page():
         st.header("3. Đề xuất")
         if 'data_loaded' in st.session_state and st.session_state['data_loaded']:
             with st.container(height=550, border=False):
-                st.info("Dựa trên dữ liệu 50 ngày gần nhất..."); st.success("🤖 AI: Học sinh đang có xu hướng Hoạt động.")
+                st.info("Dựa trên tần suất vi phạm và hoạt động"); st.success("🤖 AI: Học sinh đang có xu hướng Hoạt động.")
 
 # ==========================================
 # 5. ĐIỀU HƯỚNG CHÍNH
@@ -401,4 +401,5 @@ with st.sidebar:
 
 if st.session_state['current_page'] == 'dashboard': render_ias_dashboard_page()
 else: render_data_management_page()
+
 
